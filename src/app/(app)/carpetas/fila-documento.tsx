@@ -66,22 +66,24 @@ export function FilaDocumento({
   }
 
   async function onSoporte(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
     setSubiendo(true);
     try {
-      const contentType = file.type || "application/octet-stream";
-      const { url, key } = await generarUrlSubida(file.name, contentType);
-      const res = await fetch(url, { method: "PUT", body: file, headers: { "Content-Type": contentType } });
-      if (!res.ok) throw new Error("Falló la subida");
-      await registrarDocumento({
-        expedienteId: doc.id,
-        r2Key: key,
-        nombreArchivo: file.name,
-        mime: contentType,
-        tamano: file.size,
-        tipoSoporte: "otro",
-      });
+      for (const file of files) {
+        const contentType = file.type || "application/octet-stream";
+        const { url, key } = await generarUrlSubida(file.name, contentType);
+        const res = await fetch(url, { method: "PUT", body: file, headers: { "Content-Type": contentType } });
+        if (!res.ok) throw new Error("Falló la subida");
+        await registrarDocumento({
+          expedienteId: doc.id,
+          r2Key: key,
+          nombreArchivo: file.name,
+          mime: contentType,
+          tamano: file.size,
+          tipoSoporte: "otro",
+        });
+      }
       router.refresh();
     } finally {
       setSubiendo(false);
@@ -136,6 +138,7 @@ export function FilaDocumento({
             <input
               ref={fileRef}
               type="file"
+              multiple
               accept="application/pdf,image/*"
               className="hidden"
               onChange={onSoporte}

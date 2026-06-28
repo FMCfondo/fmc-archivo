@@ -29,27 +29,29 @@ export function Uploader({ expedienteId }: { expedienteId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   async function onChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
     setSubiendo(true);
     setError(null);
     try {
-      const contentType = file.type || "application/octet-stream";
-      const { url, key } = await generarUrlSubida(file.name, contentType);
-      const res = await fetch(url, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": contentType },
-      });
-      if (!res.ok) throw new Error("No se pudo subir el archivo al almacenamiento.");
-      await registrarDocumento({
-        expedienteId,
-        r2Key: key,
-        nombreArchivo: file.name,
-        mime: contentType,
-        tamano: file.size,
-        tipoSoporte: tipo,
-      });
+      for (const file of files) {
+        const contentType = file.type || "application/octet-stream";
+        const { url, key } = await generarUrlSubida(file.name, contentType);
+        const res = await fetch(url, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": contentType },
+        });
+        if (!res.ok) throw new Error("No se pudo subir el archivo al almacenamiento.");
+        await registrarDocumento({
+          expedienteId,
+          r2Key: key,
+          nombreArchivo: file.name,
+          mime: contentType,
+          tamano: file.size,
+          tipoSoporte: tipo,
+        });
+      }
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al subir el archivo.");
@@ -77,6 +79,7 @@ export function Uploader({ expedienteId }: { expedienteId: string }) {
         <input
           ref={inputRef}
           type="file"
+          multiple
           accept="application/pdf,image/*"
           onChange={onChange}
           disabled={subiendo}
