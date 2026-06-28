@@ -121,10 +121,28 @@ export default async function DetalleExpedientePage({
 
       {/* Documentos */}
       <section className="rounded-xl border border-neutral-200 bg-white p-5">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-neutral-500">
             Documentos y soportes ({docs.length})
           </h2>
+          {docs.length > 0 && (
+            <div className="flex items-center gap-2">
+              <a
+                href={`/expedientes/${exp.id}/pdf`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800"
+              >
+                Ver unido (PDF)
+              </a>
+              <a
+                href={`/expedientes/${exp.id}/pdf?dl=1`}
+                className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+              >
+                Descargar
+              </a>
+            </div>
+          )}
         </div>
 
         <Uploader expedienteId={exp.id} />

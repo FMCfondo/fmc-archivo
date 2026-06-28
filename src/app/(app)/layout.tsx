@@ -12,18 +12,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <header className="border-b border-neutral-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-6">
-            <Link href="/inicio" className="font-semibold">
+            <Link href="/carpetas" className="font-semibold">
               Archivo FMC
             </Link>
             <nav className="flex items-center gap-4 text-sm text-neutral-600">
+              <Link href="/carpetas" className="hover:text-neutral-900">
+                Carpetas
+              </Link>
               <Link href="/inicio" className="hover:text-neutral-900">
                 Inicio
               </Link>
               <Link href="/expedientes" className="hover:text-neutral-900">
-                Expedientes
-              </Link>
-              <Link href="/expedientes/nuevo" className="hover:text-neutral-900">
-                Nuevo
+                Buscar
               </Link>
               <Link href="/catalogo" className="hover:text-neutral-900">
                 Catálogo

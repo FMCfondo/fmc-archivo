@@ -30,13 +30,12 @@ export function CamposExpediente({
 }) {
   return (
     <>
-      {/* Identificación */}
+      {/* Lo esencial */}
       <section className="space-y-4 rounded-xl border border-neutral-200 bg-white p-5">
-        <h2 className="text-sm font-semibold text-neutral-500">Identificación</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="tipoId" className={label}>
-              Tipo de documento *
+              Carpeta / tipo de documento *
             </label>
             <select
               id="tipoId"
@@ -46,7 +45,7 @@ export function CamposExpediente({
               className={input}
             >
               <option value="" disabled>
-                Selecciona una categoría…
+                Selecciona…
               </option>
               {opciones.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -54,76 +53,6 @@ export function CamposExpediente({
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <label htmlFor="consecutivo" className={label}>
-              Consecutivo
-            </label>
-            <input
-              id="consecutivo"
-              name="consecutivo"
-              defaultValue={exp?.consecutivo ?? ""}
-              placeholder="Automático si lo dejas vacío"
-              className={input}
-            />
-            <p className="mt-1 text-xs text-neutral-400">
-              Se genera solo según el tipo; puedes escribir uno distinto para corregirlo.
-            </p>
-          </div>
-          <div>
-            <label htmlFor="periodo" className={label}>
-              Periodo
-            </label>
-            <input
-              id="periodo"
-              name="periodo"
-              type="month"
-              defaultValue={exp?.periodo ?? ""}
-              className={input}
-            />
-          </div>
-          <div>
-            <label htmlFor="fecha" className={label}>
-              Fecha del documento
-            </label>
-            <input
-              id="fecha"
-              name="fecha"
-              type="date"
-              defaultValue={exp?.fecha ?? ""}
-              className={input}
-            />
-          </div>
-          <div>
-            <label htmlFor="tercero" className={label}>
-              Tercero (proveedor / empleado / cliente)
-            </label>
-            <input id="tercero" name="tercero" defaultValue={exp?.tercero ?? ""} className={input} />
-          </div>
-          <div>
-            <label htmlFor="nitTercero" className={label}>
-              NIT / Cédula
-            </label>
-            <input
-              id="nitTercero"
-              name="nitTercero"
-              defaultValue={exp?.nitTercero ?? ""}
-              className={input}
-            />
-          </div>
-          <div>
-            <label htmlFor="valor" className={label}>
-              Valor (COP)
-            </label>
-            <input
-              id="valor"
-              name="valor"
-              type="number"
-              step="0.01"
-              min="0"
-              defaultValue={exp?.valor ?? ""}
-              className={input}
-            />
           </div>
           <div>
             <label htmlFor="estado" className={label}>
@@ -140,74 +69,169 @@ export function CamposExpediente({
               <option value="fusionado">Fusionado</option>
             </select>
           </div>
-        </div>
-        <div>
-          <label htmlFor="concepto" className={label}>
-            Concepto / descripción
-          </label>
-          <textarea
-            id="concepto"
-            name="concepto"
-            rows={2}
-            defaultValue={exp?.concepto ?? ""}
-            className={input}
-          />
-        </div>
-      </section>
-
-      {/* Carpeta física */}
-      <section className="space-y-4 rounded-xl border border-neutral-200 bg-white p-5">
-        <h2 className="text-sm font-semibold text-neutral-500">Carpeta física</h2>
-        <label className="flex items-center gap-2 text-sm text-neutral-700">
-          <input
-            type="checkbox"
-            name="tieneCarpetaFisica"
-            defaultChecked={exp?.tieneCarpetaFisica ?? false}
-            className="h-4 w-4"
-          />
-          Existe una carpeta física para este expediente
-        </label>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div>
-            <label htmlFor="rotuloCarpeta" className={label}>
-              Rótulo de la carpeta
+          <div className="sm:col-span-2">
+            <label htmlFor="concepto" className={label}>
+              Concepto / nombre corto
             </label>
             <input
-              id="rotuloCarpeta"
-              name="rotuloCarpeta"
-              defaultValue={exp?.rotuloCarpeta ?? ""}
-              placeholder="Ej. AZ 10 - EGRESOS 2024"
+              id="concepto"
+              name="concepto"
+              defaultValue={exp?.concepto ?? ""}
+              placeholder="Ej. Pago nómina segunda quincena de mayo"
               className={input}
             />
-          </div>
-          <div>
-            <label htmlFor="ubicacionFisica" className={label}>
-              Ubicación
-            </label>
-            <input
-              id="ubicacionFisica"
-              name="ubicacionFisica"
-              defaultValue={exp?.ubicacionFisica ?? ""}
-              placeholder="Archivador / oficina / caja"
-              className={input}
-            />
-          </div>
-          <div>
-            <label htmlFor="folio" className={label}>
-              Folio
-            </label>
-            <input id="folio" name="folio" defaultValue={exp?.folio ?? ""} className={input} />
           </div>
         </div>
       </section>
 
-      {/* Notas */}
-      <section className="space-y-4 rounded-xl border border-neutral-200 bg-white p-5">
-        <label htmlFor="notas" className={label}>
-          Notas
-        </label>
-        <textarea id="notas" name="notas" rows={2} defaultValue={exp?.notas ?? ""} className={input} />
-      </section>
+      {/* Todo lo demás, plegado */}
+      <details
+        open={!!exp}
+        className="rounded-xl border border-neutral-200 bg-white p-5 [&_summary]:list-none"
+      >
+        <summary className="cursor-pointer text-sm font-semibold text-neutral-500">
+          + Más datos (opcional): periodo, tercero, valor, consecutivo y carpeta física
+        </summary>
+
+        <div className="mt-4 space-y-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="consecutivo" className={label}>
+                Consecutivo
+              </label>
+              <input
+                id="consecutivo"
+                name="consecutivo"
+                defaultValue={exp?.consecutivo ?? ""}
+                placeholder="Automático si lo dejas vacío"
+                className={input}
+              />
+            </div>
+            <div>
+              <label htmlFor="periodo" className={label}>
+                Periodo
+              </label>
+              <input
+                id="periodo"
+                name="periodo"
+                type="month"
+                defaultValue={exp?.periodo ?? ""}
+                className={input}
+              />
+            </div>
+            <div>
+              <label htmlFor="fecha" className={label}>
+                Fecha del documento
+              </label>
+              <input
+                id="fecha"
+                name="fecha"
+                type="date"
+                defaultValue={exp?.fecha ?? ""}
+                className={input}
+              />
+            </div>
+            <div>
+              <label htmlFor="valor" className={label}>
+                Valor (COP)
+              </label>
+              <input
+                id="valor"
+                name="valor"
+                type="number"
+                step="0.01"
+                min="0"
+                defaultValue={exp?.valor ?? ""}
+                className={input}
+              />
+            </div>
+            <div>
+              <label htmlFor="tercero" className={label}>
+                Tercero (proveedor / empleado)
+              </label>
+              <input
+                id="tercero"
+                name="tercero"
+                defaultValue={exp?.tercero ?? ""}
+                className={input}
+              />
+            </div>
+            <div>
+              <label htmlFor="nitTercero" className={label}>
+                NIT / Cédula
+              </label>
+              <input
+                id="nitTercero"
+                name="nitTercero"
+                defaultValue={exp?.nitTercero ?? ""}
+                className={input}
+              />
+            </div>
+          </div>
+
+          <div className="border-t border-neutral-100 pt-4">
+            <label className="flex items-center gap-2 text-sm text-neutral-700">
+              <input
+                type="checkbox"
+                name="tieneCarpetaFisica"
+                defaultChecked={exp?.tieneCarpetaFisica ?? false}
+                className="h-4 w-4"
+              />
+              Existe una carpeta física
+            </label>
+            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label htmlFor="rotuloCarpeta" className={label}>
+                  Rótulo
+                </label>
+                <input
+                  id="rotuloCarpeta"
+                  name="rotuloCarpeta"
+                  defaultValue={exp?.rotuloCarpeta ?? ""}
+                  placeholder="Ej. AZ 10 - EGRESOS 2024"
+                  className={input}
+                />
+              </div>
+              <div>
+                <label htmlFor="ubicacionFisica" className={label}>
+                  Ubicación
+                </label>
+                <input
+                  id="ubicacionFisica"
+                  name="ubicacionFisica"
+                  defaultValue={exp?.ubicacionFisica ?? ""}
+                  placeholder="Archivador / oficina"
+                  className={input}
+                />
+              </div>
+              <div>
+                <label htmlFor="folio" className={label}>
+                  Folio
+                </label>
+                <input
+                  id="folio"
+                  name="folio"
+                  defaultValue={exp?.folio ?? ""}
+                  className={input}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-neutral-100 pt-4">
+            <label htmlFor="notas" className={label}>
+              Notas
+            </label>
+            <textarea
+              id="notas"
+              name="notas"
+              rows={2}
+              defaultValue={exp?.notas ?? ""}
+              className={input}
+            />
+          </div>
+        </div>
+      </details>
     </>
   );
 }

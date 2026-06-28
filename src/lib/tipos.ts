@@ -71,3 +71,23 @@ export function resolverSerie(
   }
   return { ownerId: original?.id ?? tipoId, prefijo: null, libro: null, codigo: original?.codigo ?? "" };
 }
+
+/** Ruta completa de una carpeta: "Egresos / Nómina / Quincenal". */
+export function rutaTipo(tipos: Tipo[], id: string): string {
+  const map = new Map(tipos.map((t) => [t.id, t] as const));
+  const partes: string[] = [];
+  let cur = map.get(id);
+  let guard = 0;
+  while (cur && guard++ < 20) {
+    partes.unshift(cur.nombre);
+    cur = cur.parentId ? map.get(cur.parentId) : undefined;
+  }
+  return partes.join(" / ");
+}
+
+/** Lista de carpetas con su ruta completa, ordenada, para usar en un <select>. */
+export function opcionesConRuta(tipos: Tipo[]): { id: string; ruta: string }[] {
+  return tipos
+    .map((t) => ({ id: t.id, ruta: rutaTipo(tipos, t.id) }))
+    .sort((a, b) => a.ruta.localeCompare(b.ruta, "es"));
+}

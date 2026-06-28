@@ -32,3 +32,11 @@ export async function urlDescarga(key: string) {
 export async function eliminarObjeto(key: string) {
   await r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: key }));
 }
+
+/** Descargar los bytes de un archivo desde R2 (para unir PDFs en el servidor). */
+export async function obtenerBytes(key: string): Promise<Uint8Array> {
+  const res = await r2.send(new GetObjectCommand({ Bucket: R2_BUCKET, Key: key }));
+  const arr = await res.Body?.transformToByteArray();
+  if (!arr) throw new Error("Archivo vacío en R2.");
+  return arr;
+}
