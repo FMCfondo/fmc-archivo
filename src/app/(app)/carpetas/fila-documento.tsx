@@ -43,6 +43,7 @@ export function FilaDocumento({
   const [errSoporte, setErrSoporte] = useState<string | null>(null);
   const [guardado, setGuardado] = useState(false);
   const [errGuardar, setErrGuardar] = useState<string | null>(null);
+  const [mostrar, setMostrar] = useState(false);
 
   const sucio =
     nombre !== doc.nombre ||
@@ -131,19 +132,18 @@ export function FilaDocumento({
         )}
       </td>
       <td className={td}>
-        <div className="flex flex-wrap items-center gap-1">
-          {doc.soportes.map((s) => (
-            <span
-              key={s.id}
-              className="inline-flex max-w-[140px] items-center gap-1 rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700"
-              title={s.nombre}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-neutral-600">
+            {doc.soportes.length} soporte{doc.soportes.length === 1 ? "" : "s"}
+          </span>
+          {doc.soportes.length > 0 && (
+            <button
+              onClick={() => setMostrar((v) => !v)}
+              className="text-xs text-blue-600 hover:underline"
             >
-              <span className="truncate">{s.nombre}</span>
-              <button onClick={() => quitarSoporte(s.id)} className="text-neutral-400 hover:text-red-600">
-                ×
-              </button>
-            </span>
-          ))}
+              {mostrar ? "Ocultar" : "Mostrar detalle"}
+            </button>
+          )}
           <label className="cursor-pointer rounded border border-dashed border-neutral-300 px-2 py-0.5 text-xs text-neutral-500 hover:bg-neutral-50">
             {subiendo ? "…" : "+ Agregar"}
             <input
@@ -157,6 +157,25 @@ export function FilaDocumento({
             />
           </label>
         </div>
+        {mostrar && doc.soportes.length > 0 && (
+          <div className="mt-2 flex max-w-xs flex-col gap-1">
+            {doc.soportes.map((s) => (
+              <span
+                key={s.id}
+                className="flex items-center justify-between gap-1 rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700"
+                title={s.nombre}
+              >
+                <span className="truncate">{s.nombre}</span>
+                <button
+                  onClick={() => quitarSoporte(s.id)}
+                  className="shrink-0 text-neutral-400 hover:text-red-600"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         {errSoporte && <p className="mt-1 text-xs text-red-600">{errSoporte}</p>}
       </td>
       <td className={`${td} w-48`}>
