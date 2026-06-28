@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { crearDocumentoRapido } from "./actions";
 import { generarUrlSubida, registrarDocumento } from "../expedientes/actions";
+import { conReintentos } from "@/lib/reintentos";
 
 export function SubirDocumento({ tipoId }: { tipoId: string }) {
   const router = useRouter();
@@ -22,16 +23,20 @@ export function SubirDocumento({ tipoId }: { tipoId: string }) {
       const file = files[i];
       setProgreso(files.length > 1 ? `${i + 1}/${files.length}` : "");
       try {
+        const contentType = file.type || "application/octet-stream";
+        // Sube primero a R2 (con reintentos); solo si funciona, crea la fila.
+        const key = await conReintentos(async () => {
+          const { url, key } = await generarUrlSubida(file.name, contentType);
+          const res = await fetch(url, {
+            method: "PUT",
+            body: file,
+            headers: { "Content-Type": contentType },
+          });
+          if (!res.ok) throw new Error(`R2 respondió ${res.status}`);
+          return key;
+        });
         const nombre = file.name.replace(/\.[^.]+$/, "");
         const { id } = await crearDocumentoRapido(tipoId, nombre);
-        const contentType = file.type || "application/octet-stream";
-        const { url, key } = await generarUrlSubida(file.name, contentType);
-        const res = await fetch(url, {
-          method: "PUT",
-          body: file,
-          headers: { "Content-Type": contentType },
-        });
-        if (!res.ok) throw new Error(`R2 respondió ${res.status}`);
         await registrarDocumento({
           expedienteId: id,
           r2Key: key,
@@ -66,7 +71,7 @@ export function SubirDocumento({ tipoId }: { tipoId: string }) {
         />
       </label>
       <span className="text-xs text-neutral-400">Puedes elegir varios; cada archivo crea un documento.</span>
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      {error && <span className="max-w-md text-right text-xs text-red-600">{error}</span>}
     </div>
   );
 }

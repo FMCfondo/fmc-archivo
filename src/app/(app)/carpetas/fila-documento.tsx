@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { guardarDocumento, eliminarFila } from "./actions";
 import { generarUrlSubida, registrarDocumento, eliminarDocumento } from "../expedientes/actions";
+import { conReintentos } from "@/lib/reintentos";
 
 type Soporte = { id: string; nombre: string };
 type Opcion = { id: string; ruta: string };
@@ -75,9 +76,12 @@ export function FilaDocumento({
     for (const file of files) {
       try {
         const contentType = file.type || "application/octet-stream";
-        const { url, key } = await generarUrlSubida(file.name, contentType);
-        const res = await fetch(url, { method: "PUT", body: file, headers: { "Content-Type": contentType } });
-        if (!res.ok) throw new Error(`R2 respondió ${res.status}`);
+        const key = await conReintentos(async () => {
+          const { url, key } = await generarUrlSubida(file.name, contentType);
+          const res = await fetch(url, { method: "PUT", body: file, headers: { "Content-Type": contentType } });
+          if (!res.ok) throw new Error(`R2 respondió ${res.status}`);
+          return key;
+        });
         await registrarDocumento({
           expedienteId: doc.id,
           r2Key: key,
