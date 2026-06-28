@@ -17,10 +17,11 @@ export function SubirDocumento({ tipoId }: { tipoId: string }) {
     if (files.length === 0) return;
     setSubiendo(true);
     setError(null);
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setProgreso(files.length > 1 ? `${i + 1}/${files.length}` : "");
+    const fallos: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setProgreso(files.length > 1 ? `${i + 1}/${files.length}` : "");
+      try {
         const nombre = file.name.replace(/\.[^.]+$/, "");
         const { id } = await crearDocumentoRapido(tipoId, nombre);
         const contentType = file.type || "application/octet-stream";
@@ -30,7 +31,7 @@ export function SubirDocumento({ tipoId }: { tipoId: string }) {
           body: file,
           headers: { "Content-Type": contentType },
         });
-        if (!res.ok) throw new Error(`No se pudo subir ${file.name}.`);
+        if (!res.ok) throw new Error(`R2 respondió ${res.status}`);
         await registrarDocumento({
           expedienteId: id,
           r2Key: key,
@@ -39,15 +40,15 @@ export function SubirDocumento({ tipoId }: { tipoId: string }) {
           tamano: file.size,
           tipoSoporte: "principal",
         });
+      } catch (err) {
+        fallos.push(`${file.name}: ${err instanceof Error ? err.message : "error"}`);
       }
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al subir.");
-    } finally {
-      setSubiendo(false);
-      setProgreso("");
-      if (ref.current) ref.current.value = "";
     }
+    setSubiendo(false);
+    setProgreso("");
+    if (ref.current) ref.current.value = "";
+    if (fallos.length) setError(`Fallaron ${fallos.length} de ${files.length}: ${fallos.join(" | ")}`);
+    router.refresh();
   }
 
   return (

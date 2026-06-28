@@ -39,6 +39,7 @@ export function FilaDocumento({
   const [ubicacion, setUbicacion] = useState(doc.ubicacion);
   const [guardando, setGuardando] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
+  const [errSoporte, setErrSoporte] = useState<string | null>(null);
 
   const sucio =
     nombre !== doc.nombre ||
@@ -69,12 +70,14 @@ export function FilaDocumento({
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
     setSubiendo(true);
-    try {
-      for (const file of files) {
+    setErrSoporte(null);
+    const fallos: string[] = [];
+    for (const file of files) {
+      try {
         const contentType = file.type || "application/octet-stream";
         const { url, key } = await generarUrlSubida(file.name, contentType);
         const res = await fetch(url, { method: "PUT", body: file, headers: { "Content-Type": contentType } });
-        if (!res.ok) throw new Error("Falló la subida");
+        if (!res.ok) throw new Error(`R2 respondió ${res.status}`);
         await registrarDocumento({
           expedienteId: doc.id,
           r2Key: key,
@@ -83,12 +86,14 @@ export function FilaDocumento({
           tamano: file.size,
           tipoSoporte: "otro",
         });
+      } catch (err) {
+        fallos.push(`${file.name}: ${err instanceof Error ? err.message : "error"}`);
       }
-      router.refresh();
-    } finally {
-      setSubiendo(false);
-      if (fileRef.current) fileRef.current.value = "";
     }
+    setSubiendo(false);
+    if (fileRef.current) fileRef.current.value = "";
+    if (fallos.length) setErrSoporte(`Fallaron ${fallos.length}: ${fallos.join(" | ")}`);
+    router.refresh();
   }
 
   async function quitarSoporte(idSoporte: string) {
@@ -146,6 +151,7 @@ export function FilaDocumento({
             />
           </label>
         </div>
+        {errSoporte && <p className="mt-1 text-xs text-red-600">{errSoporte}</p>}
       </td>
       <td className={`${td} w-48`}>
         <select
