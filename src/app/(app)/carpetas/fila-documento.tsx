@@ -41,6 +41,8 @@ export function FilaDocumento({
   const [guardando, setGuardando] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
   const [errSoporte, setErrSoporte] = useState<string | null>(null);
+  const [guardado, setGuardado] = useState(false);
+  const [errGuardar, setErrGuardar] = useState<string | null>(null);
 
   const sucio =
     nombre !== doc.nombre ||
@@ -51,6 +53,7 @@ export function FilaDocumento({
 
   async function guardar() {
     setGuardando(true);
+    setErrGuardar(null);
     try {
       const fd = new FormData();
       fd.set("id", doc.id);
@@ -61,7 +64,11 @@ export function FilaDocumento({
       fd.set("ubicacion", ubicacion);
       fd.set("carpetaActual", carpetaActual);
       await guardarDocumento(fd);
+      setGuardado(true);
+      setTimeout(() => setGuardado(false), 2500);
       router.refresh();
+    } catch (err) {
+      setErrGuardar(err instanceof Error ? err.message : "No se pudo guardar.");
     } finally {
       setGuardando(false);
     }
@@ -196,18 +203,22 @@ export function FilaDocumento({
           </a>
         </div>
       </td>
-      <td className={`${td} w-24`}>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={guardar}
-            disabled={!sucio || guardando}
-            className="rounded-lg bg-neutral-900 px-2 py-1 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-40"
-          >
-            {guardando ? "…" : "Guardar"}
-          </button>
-          <button onClick={borrar} className="text-xs text-red-600 hover:underline">
-            Eliminar
-          </button>
+      <td className={`${td} w-28`}>
+        <div className="flex flex-col items-start gap-1">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={guardar}
+              disabled={guardando}
+              className={`rounded-lg px-2 py-1 text-xs font-medium text-white disabled:opacity-40 ${sucio ? "bg-neutral-900 hover:bg-neutral-800" : "bg-neutral-400 hover:bg-neutral-500"}`}
+            >
+              {guardando ? "…" : "Guardar"}
+            </button>
+            <button onClick={borrar} className="text-xs text-red-600 hover:underline">
+              Eliminar
+            </button>
+          </div>
+          {guardado && <span className="text-xs text-emerald-600">✓ Guardado</span>}
+          {errGuardar && <span className="text-xs text-red-600">{errGuardar}</span>}
         </div>
       </td>
     </tr>
