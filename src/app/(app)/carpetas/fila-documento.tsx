@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { guardarDocumento, eliminarFila } from "./actions";
-import { generarUrlSubida, registrarDocumento, eliminarDocumento } from "../expedientes/actions";
+import { eliminarDocumento } from "../expedientes/actions";
 import { conReintentos } from "@/lib/reintentos";
 
 type Soporte = { id: string; nombre: string };
@@ -75,20 +75,15 @@ export function FilaDocumento({
     const fallos: string[] = [];
     for (const file of files) {
       try {
-        const contentType = file.type || "application/octet-stream";
-        const key = await conReintentos(async () => {
-          const { url, key } = await generarUrlSubida(file.name, contentType);
-          const res = await fetch(url, { method: "PUT", body: file, headers: { "Content-Type": contentType } });
-          if (!res.ok) throw new Error(`R2 respondió ${res.status}`);
-          return key;
-        });
-        await registrarDocumento({
-          expedienteId: doc.id,
-          r2Key: key,
-          nombreArchivo: file.name,
-          mime: contentType,
-          tamano: file.size,
-          tipoSoporte: "otro",
+        const fd = new FormData();
+        fd.set("file", file);
+        fd.set("expedienteId", doc.id);
+        fd.set("tipoSoporte", "otro");
+        await conReintentos(async () => {
+          const r = await fetch("/api/subir", { method: "POST", body: fd });
+          if (!r.ok) {
+            throw new Error(r.status === 413 ? "archivo muy grande (máx ~4.5 MB)" : `servidor ${r.status}`);
+          }
         });
       } catch (err) {
         fallos.push(`${file.name}: ${err instanceof Error ? err.message : "error"}`);

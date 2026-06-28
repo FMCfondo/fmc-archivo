@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { generarUrlSubida, registrarDocumento } from "../actions";
+import { conReintentos } from "@/lib/reintentos";
 
 type TipoSoporte =
   | "principal"
@@ -33,32 +33,27 @@ export function Uploader({ expedienteId }: { expedienteId: string }) {
     if (files.length === 0) return;
     setSubiendo(true);
     setError(null);
-    try {
-      for (const file of files) {
-        const contentType = file.type || "application/octet-stream";
-        const { url, key } = await generarUrlSubida(file.name, contentType);
-        const res = await fetch(url, {
-          method: "PUT",
-          body: file,
-          headers: { "Content-Type": contentType },
+    const fallos: string[] = [];
+    for (const file of files) {
+      try {
+        const fd = new FormData();
+        fd.set("file", file);
+        fd.set("expedienteId", expedienteId);
+        fd.set("tipoSoporte", tipo);
+        await conReintentos(async () => {
+          const r = await fetch("/api/subir", { method: "POST", body: fd });
+          if (!r.ok) {
+            throw new Error(r.status === 413 ? "archivo muy grande (máx ~4.5 MB)" : `servidor ${r.status}`);
+          }
         });
-        if (!res.ok) throw new Error("No se pudo subir el archivo al almacenamiento.");
-        await registrarDocumento({
-          expedienteId,
-          r2Key: key,
-          nombreArchivo: file.name,
-          mime: contentType,
-          tamano: file.size,
-          tipoSoporte: tipo,
-        });
+      } catch (err) {
+        fallos.push(`${file.name}: ${err instanceof Error ? err.message : "error"}`);
       }
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al subir el archivo.");
-    } finally {
-      setSubiendo(false);
-      if (inputRef.current) inputRef.current.value = "";
     }
+    setSubiendo(false);
+    if (inputRef.current) inputRef.current.value = "";
+    if (fallos.length) setError(`Fallaron ${fallos.length}: ${fallos.join(" | ")}`);
+    router.refresh();
   }
 
   return (
@@ -88,7 +83,7 @@ export function Uploader({ expedienteId }: { expedienteId: string }) {
         {subiendo && <span className="text-sm text-neutral-500">Subiendo…</span>}
       </div>
       <p className="mt-2 text-xs text-neutral-400">
-        Solo PDF e imágenes (JPG, PNG). Elige el tipo de soporte antes de seleccionar el archivo.
+        Solo PDF e imágenes. Elige el tipo de soporte antes de seleccionar.
       </p>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </div>

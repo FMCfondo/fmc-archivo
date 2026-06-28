@@ -2,8 +2,6 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { crearDocumentoRapido } from "./actions";
-import { generarUrlSubida, registrarDocumento } from "../expedientes/actions";
 import { conReintentos } from "@/lib/reintentos";
 
 export function SubirDocumento({ tipoId }: { tipoId: string }) {
@@ -23,27 +21,14 @@ export function SubirDocumento({ tipoId }: { tipoId: string }) {
       const file = files[i];
       setProgreso(files.length > 1 ? `${i + 1}/${files.length}` : "");
       try {
-        const contentType = file.type || "application/octet-stream";
-        // Sube primero a R2 (con reintentos); solo si funciona, crea la fila.
-        const key = await conReintentos(async () => {
-          const { url, key } = await generarUrlSubida(file.name, contentType);
-          const res = await fetch(url, {
-            method: "PUT",
-            body: file,
-            headers: { "Content-Type": contentType },
-          });
-          if (!res.ok) throw new Error(`R2 respondió ${res.status}`);
-          return key;
-        });
-        const nombre = file.name.replace(/\.[^.]+$/, "");
-        const { id } = await crearDocumentoRapido(tipoId, nombre);
-        await registrarDocumento({
-          expedienteId: id,
-          r2Key: key,
-          nombreArchivo: file.name,
-          mime: contentType,
-          tamano: file.size,
-          tipoSoporte: "principal",
+        const fd = new FormData();
+        fd.set("file", file);
+        fd.set("tipoId", tipoId);
+        await conReintentos(async () => {
+          const r = await fetch("/api/subir", { method: "POST", body: fd });
+          if (!r.ok) {
+            throw new Error(r.status === 413 ? "archivo muy grande (máx ~4.5 MB)" : `servidor ${r.status}`);
+          }
         });
       } catch (err) {
         fallos.push(`${file.name}: ${err instanceof Error ? err.message : "error"}`);
