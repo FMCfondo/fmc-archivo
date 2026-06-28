@@ -72,3 +72,6 @@ permita tu origen. En el bucket → **Settings → CORS Policy**:
 - `src/lib/` — sesión, R2, formato
 - `src/app/(app)/expedientes/` — listado, creación, detalle y subida
 - `src/app/(app)/catalogo/` — gestión de categorías
+
+
+
