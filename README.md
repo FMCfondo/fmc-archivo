@@ -75,3 +75,5 @@ permita tu origen. En el bucket → **Settings → CORS Policy**:
 
 
 
+
+
