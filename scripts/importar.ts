@@ -11,6 +11,7 @@ const BASE = "L:\\Mi unidad\\Fondo Mutuo De Cobertura\\FMC\\ARCHIVO";
 const REAL = process.argv.includes("--real");
 const RESET = process.argv.includes("--reset");
 const EXTS = [".pdf", ".jpg", ".jpeg", ".png"];
+const CONCURRENCIA = 6;
 
 const MAPA: Record<string, { nombre: string; codigo: string; importar: boolean }> = {
   "1--EGRESOS": { nombre: "EGRESOS", codigo: "1", importar: true },
@@ -51,8 +52,20 @@ const norm = (s: string) =>
 const mimeDe = (ext: string) =>
   ext === ".pdf" ? "application/pdf" : ext === ".png" ? "image/png" : "image/jpeg";
 
+async function pool<T>(items: T[], n: number, fn: (item: T) => Promise<void>) {
+  let idx = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(n, items.length) }, async () => {
+      while (idx < items.length) {
+        const i = idx++;
+        await fn(items[i]);
+      }
+    }),
+  );
+}
+
 async function main() {
-  console.log(REAL ? "### MODO REAL ###" : "### SIMULACIÓN (usa --real) ###");
+  console.log(REAL ? "### MODO REAL (concurrencia " + CONCURRENCIA + ") ###" : "### SIMULACIÓN (usa --real) ###");
   const empresa = (await db.select().from(empresas).where(eq(empresas.nombre, "FMC")).limit(1))[0];
   const empresaId = empresa.id;
   const adminMemb = (
@@ -69,14 +82,16 @@ async function main() {
       .select({ expedienteId: documentos.expedienteId, r2Key: documentos.r2Key })
       .from(documentos)
       .where(and(eq(documentos.empresaId, empresaId), like(documentos.r2Key, "%/import/%")));
-    console.log(`Reset: borrando ${previos.length} documentos importados antes...`);
-    for (const d of previos) {
+    console.log(`Reset: borrando ${previos.length} importados previos...`);
+    await pool(previos, 10, async (d) => {
       try {
         await r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: d.r2Key }));
       } catch {}
-    }
+    });
     const expIds = [...new Set(previos.map((d) => d.expedienteId))];
-    for (const id of expIds) await db.delete(expedientes).where(eq(expedientes.id, id));
+    await pool(expIds, 10, async (id) => {
+      await db.delete(expedientes).where(eq(expedientes.id, id));
+    });
     console.log(`Reset listo (${expIds.length} expedientes eliminados).`);
   }
 
@@ -103,7 +118,7 @@ async function main() {
   }
 
   let totalSubidos = 0;
-  let totalDupContenido = 0;
+  let totalDup = 0;
 
   for (const [driveName, cfg] of Object.entries(MAPA)) {
     const carpetaPath = join(BASE, driveName);
@@ -112,10 +127,11 @@ async function main() {
       console.log(`📁 ${cfg.nombre} (carpeta lista, sin importar)`);
       continue;
     }
-
     let rels: string[] = [];
     try {
-      rels = await readdir(carpetaPath, { recursive: true });
+      rels = (await readdir(carpetaPath, { recursive: true })).filter((r) =>
+        EXTS.includes(extname(r).toLowerCase()),
+      );
     } catch {
       console.log(`⚠ No se pudo leer: ${driveName}`);
       continue;
@@ -126,40 +142,38 @@ async function main() {
     let subidos = 0;
     let dups = 0;
 
-    for (const rel of rels) {
+    await pool(rels, CONCURRENCIA, async (rel) => {
       const ext = extname(rel).toLowerCase();
-      if (!EXTS.includes(ext)) continue;
       const full = join(carpetaPath, rel);
       let st;
       try {
         st = await stat(full);
       } catch {
-        continue;
+        return;
       }
-      if (!st.isFile()) continue;
-
+      if (!st.isFile()) return;
       if (!REAL) {
         subidos++;
         totalSubidos++;
-        continue;
+        return;
       }
-
-      const bytes = await readFile(full);
+      let bytes;
+      try {
+        bytes = await readFile(full);
+      } catch {
+        return;
+      }
       const hash = createHash("sha256").update(bytes).digest("hex");
+      // Decisión sincrónica (sin await) => sin condiciones de carrera
       if (hashes.has(hash)) {
         dups++;
-        totalDupContenido++;
-        continue;
+        totalDup++;
+        return;
       }
       hashes.add(hash);
-
       const original = basename(rel);
-      let nombreFinal = original;
       const usadas = nombresUsados.get(original) ?? 0;
-      if (usadas > 0) {
-        const sinExt = original.replace(/\.[^.]+$/, "");
-        nombreFinal = `${sinExt} (${usadas + 1})${ext}`;
-      }
+      const nombreFinal = usadas > 0 ? `${original.replace(/\.[^.]+$/, "")} (${usadas + 1})${ext}` : original;
       nombresUsados.set(original, usadas + 1);
 
       const key = `${empresaId}/import/${crypto.randomUUID()}${ext}`;
@@ -182,11 +196,12 @@ async function main() {
       subidos++;
       totalSubidos++;
       if (totalSubidos % 50 === 0) console.log(`   ... ${totalSubidos} subidos`);
-    }
+    });
+
     console.log(`📂 ${cfg.nombre}: ${subidos} subidos${dups ? ` (${dups} copias idénticas omitidas)` : ""}`);
   }
 
-  console.log(`\nTotal: ${totalSubidos} documentos${REAL ? ` (${totalDupContenido} copias idénticas omitidas)` : ""}.`);
+  console.log(`\nTotal: ${totalSubidos} documentos${REAL ? ` (${totalDup} copias idénticas omitidas)` : ""}.`);
   process.exit(0);
 }
 
