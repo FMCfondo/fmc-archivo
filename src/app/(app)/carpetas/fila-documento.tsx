@@ -4,7 +4,9 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { guardarDocumento, eliminarFila } from "./actions";
 import { eliminarDocumento } from "../expedientes/actions";
-import { conReintentos } from "@/lib/reintentos";
+import { subirArchivos } from "@/lib/subir-cliente";
+import { ACCEPT_ARCHIVOS } from "@/lib/constantes";
+import { INPUT_TABLA } from "@/components/ui";
 
 type Soporte = { id: string; nombre: string };
 type Opcion = { id: string; ruta: string };
@@ -19,7 +21,7 @@ export type DocFila = {
   soportes: Soporte[];
 };
 
-const inp = "w-full rounded border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-neutral-900";
+const inp = INPUT_TABLA;
 const td = "px-3 py-3 align-top";
 
 export function FilaDocumento({
@@ -80,23 +82,7 @@ export function FilaDocumento({
     if (files.length === 0) return;
     setSubiendo(true);
     setErrSoporte(null);
-    const fallos: string[] = [];
-    for (const file of files) {
-      try {
-        const fd = new FormData();
-        fd.set("file", file);
-        fd.set("expedienteId", doc.id);
-        fd.set("tipoSoporte", "otro");
-        await conReintentos(async () => {
-          const r = await fetch("/api/subir", { method: "POST", body: fd });
-          if (!r.ok) {
-            throw new Error(r.status === 413 ? "archivo muy grande (máx ~4.5 MB)" : `servidor ${r.status}`);
-          }
-        });
-      } catch (err) {
-        fallos.push(`${file.name}: ${err instanceof Error ? err.message : "error"}`);
-      }
-    }
+    const fallos = await subirArchivos(files, { expedienteId: doc.id, tipoSoporte: "otro" });
     setSubiendo(false);
     if (fileRef.current) fileRef.current.value = "";
     if (fallos.length) setErrSoporte(`Fallaron ${fallos.length}: ${fallos.join(" | ")}`);
@@ -150,7 +136,7 @@ export function FilaDocumento({
               ref={fileRef}
               type="file"
               multiple
-              accept="application/pdf,image/*"
+              accept={ACCEPT_ARCHIVOS}
               className="hidden"
               onChange={onSoporte}
               disabled={subiendo}

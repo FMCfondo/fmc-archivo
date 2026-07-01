@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { usuarios, usuariosEmpresas } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
+import { INPUT_INLINE } from "@/components/ui";
 import {
   crearEmpresa,
   agregarMiembro,
@@ -10,8 +11,7 @@ import {
   renombrarEmpresa,
 } from "./actions";
 
-const inp =
-  "rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900";
+const inp = INPUT_INLINE;
 const ROLES = [
   ["admin", "Administrador"],
   ["editor", "Editor"],

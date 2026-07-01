@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { loginAction } from "./actions";
+import { INPUT } from "@/components/ui";
 
 export default function LoginPage() {
   const [error, formAction, pending] = useActionState(loginAction, undefined);
@@ -19,14 +20,7 @@ export default function LoginPage() {
             <label htmlFor="email" className="mb-1 block text-sm font-medium text-neutral-700">
               Correo
             </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
-            />
+            <input id="email" name="email" type="email" required autoComplete="email" className={INPUT} />
           </div>
 
           <div>
@@ -39,7 +33,7 @@ export default function LoginPage() {
               type="password"
               required
               autoComplete="current-password"
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+              className={INPUT}
             />
           </div>
 

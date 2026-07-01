@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { conReintentos } from "@/lib/reintentos";
+import { subirArchivos } from "@/lib/subir-cliente";
+import { ACCEPT_ARCHIVOS } from "@/lib/constantes";
 
 export function SubirDocumento({ tipoId }: { tipoId: string }) {
   const router = useRouter();
@@ -16,24 +17,9 @@ export function SubirDocumento({ tipoId }: { tipoId: string }) {
     if (files.length === 0) return;
     setSubiendo(true);
     setError(null);
-    const fallos: string[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      setProgreso(files.length > 1 ? `${i + 1}/${files.length}` : "");
-      try {
-        const fd = new FormData();
-        fd.set("file", file);
-        fd.set("tipoId", tipoId);
-        await conReintentos(async () => {
-          const r = await fetch("/api/subir", { method: "POST", body: fd });
-          if (!r.ok) {
-            throw new Error(r.status === 413 ? "archivo muy grande (máx ~4.5 MB)" : `servidor ${r.status}`);
-          }
-        });
-      } catch (err) {
-        fallos.push(`${file.name}: ${err instanceof Error ? err.message : "error"}`);
-      }
-    }
+    const fallos = await subirArchivos(files, { tipoId }, (actual, total) =>
+      setProgreso(total > 1 ? `${actual}/${total}` : ""),
+    );
     setSubiendo(false);
     setProgreso("");
     if (ref.current) ref.current.value = "";
@@ -49,7 +35,7 @@ export function SubirDocumento({ tipoId }: { tipoId: string }) {
           ref={ref}
           type="file"
           multiple
-          accept="application/pdf,image/*"
+          accept={ACCEPT_ARCHIVOS}
           className="hidden"
           onChange={onFiles}
           disabled={subiendo}

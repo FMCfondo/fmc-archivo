@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { and, desc, eq, ilike, isNull, or, type SQL } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { expedientes, tiposDocumento } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
+import { cargarTipos } from "@/lib/tipos";
 import { formatCOP, ETIQUETAS_ESTADO } from "@/lib/format";
 import { LIMITE_LISTADO } from "@/lib/constantes";
-import type { EstadoExpediente } from "@/db/schema";
+import { filtrosExpedientes } from "@/server/filtros";
+import { INPUT_INLINE } from "@/components/ui";
 
 export default async function ExpedientesPage({
   searchParams,
@@ -18,27 +20,8 @@ export default async function ExpedientesPage({
     Object.entries(sp).filter(([, v]) => v) as [string, string][],
   ).toString();
 
-  const tipos = await db
-    .select()
-    .from(tiposDocumento)
-    .where(eq(tiposDocumento.empresaId, empresaId))
-    .orderBy(tiposDocumento.orden);
-
-  const conds: SQL[] = [eq(expedientes.empresaId, empresaId), isNull(expedientes.eliminadoEn)];
-  if (sp.tipoId) conds.push(eq(expedientes.tipoId, sp.tipoId));
-  if (sp.periodo) conds.push(eq(expedientes.periodo, sp.periodo));
-  if (sp.estado) conds.push(eq(expedientes.estado, sp.estado as EstadoExpediente));
-  if (sp.q) {
-    const like = `%${sp.q}%`;
-    conds.push(
-      or(
-        ilike(expedientes.consecutivo, like),
-        ilike(expedientes.tercero, like),
-        ilike(expedientes.concepto, like),
-        ilike(expedientes.nitTercero, like),
-      )!,
-    );
-  }
+  const tipos = await cargarTipos(empresaId, true);
+  const conds = filtrosExpedientes(empresaId, sp);
 
   const filas = await db
     .select({
@@ -59,8 +42,7 @@ export default async function ExpedientesPage({
     .orderBy(desc(expedientes.creadoEn))
     .limit(LIMITE_LISTADO);
 
-  const inputCls =
-    "rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900";
+  const inputCls = INPUT_INLINE;
 
   return (
     <div className="space-y-5">

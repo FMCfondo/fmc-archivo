@@ -1,26 +1,14 @@
 import Link from "next/link";
-import { and, eq, isNull } from "drizzle-orm";
-import { db } from "@/db";
-import { tiposDocumento } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
+import { cargarTipos } from "@/lib/tipos";
+import { INPUT_INLINE, BTN_PRIMARIO } from "@/components/ui";
 import { crearCarpeta } from "./actions";
 
-const inp =
-  "rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900";
+const inp = INPUT_INLINE;
 
 export default async function CarpetasPage() {
   const { empresaId } = await requireEmpresaId();
-  const carpetas = await db
-    .select()
-    .from(tiposDocumento)
-    .where(
-      and(
-        eq(tiposDocumento.empresaId, empresaId),
-        isNull(tiposDocumento.parentId),
-        eq(tiposDocumento.activo, true),
-      ),
-    )
-    .orderBy(tiposDocumento.orden);
+  const carpetas = (await cargarTipos(empresaId, true)).filter((t) => !t.parentId);
 
   return (
     <div className="space-y-5">
@@ -31,9 +19,7 @@ export default async function CarpetasPage() {
         className="flex flex-wrap items-end gap-2 rounded-xl border border-neutral-200 bg-white p-4"
       >
         <input name="nombre" required placeholder="Nombre de la carpeta (ej. Egresos)" className={`${inp} flex-1`} />
-        <button className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800">
-          + Nueva carpeta
-        </button>
+        <button className={BTN_PRIMARIO}>+ Nueva carpeta</button>
       </form>
 
       <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white">

@@ -4,9 +4,9 @@ import { useActionState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { cambiarPassword } from "./actions";
+import { INPUT } from "@/components/ui";
 
-const input =
-  "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900";
+const input = INPUT;
 
 export function CambiarPasswordForm({ forzado }: { forzado: boolean }) {
   const [state, action, pending] = useActionState(cambiarPassword, undefined);

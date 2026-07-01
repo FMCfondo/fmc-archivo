@@ -1,10 +1,10 @@
 import { type NextRequest } from "next/server";
-import { and, desc, eq, ilike, isNull, or, type SQL } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { expedientes, tiposDocumento } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
 import { LIMITE_EXPORT } from "@/lib/constantes";
-import type { EstadoExpediente } from "@/db/schema";
+import { filtrosExpedientes } from "@/server/filtros";
 
 function cell(v: unknown): string {
   if (v == null) return "";
@@ -16,21 +16,13 @@ export async function GET(req: NextRequest) {
   const { empresaId } = await requireEmpresaId();
   const sp = req.nextUrl.searchParams;
 
-  const conds: SQL[] = [eq(expedientes.empresaId, empresaId), isNull(expedientes.eliminadoEn)];
-  if (sp.get("tipoId")) conds.push(eq(expedientes.tipoId, sp.get("tipoId")!));
-  if (sp.get("periodo")) conds.push(eq(expedientes.periodo, sp.get("periodo")!));
-  if (sp.get("estado")) conds.push(eq(expedientes.estado, sp.get("estado") as EstadoExpediente));
-  if (sp.get("q")) {
-    const like = `%${sp.get("q")}%`;
-    conds.push(
-      or(
-        ilike(expedientes.consecutivo, like),
-        ilike(expedientes.tercero, like),
-        ilike(expedientes.concepto, like),
-        ilike(expedientes.nitTercero, like),
-      )!,
-    );
-  }
+  // Mismos filtros que el listado: el CSV exporta exactamente lo que el usuario ve.
+  const conds = filtrosExpedientes(empresaId, {
+    q: sp.get("q"),
+    tipoId: sp.get("tipoId"),
+    periodo: sp.get("periodo"),
+    estado: sp.get("estado"),
+  });
 
   const filas = await db
     .select({

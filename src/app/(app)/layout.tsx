@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireEmpresaId } from "@/lib/session";
 import { signOut } from "@/auth";
-import { EmpresaSwitcher } from "./empresa-switcher";
+import { EmpresaSwitcher } from "@/components/empresa-switcher";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { session, empresaId, membresias } = await requireEmpresaId();

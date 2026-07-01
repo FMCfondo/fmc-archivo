@@ -46,32 +46,6 @@ export function aplanarArbol(raices: TipoNodo[]): TipoNodo[] {
   return out;
 }
 
-/**
- * Resuelve la "serie" del consecutivo: sube por los padres hasta encontrar el
- * primero con prefijo+libro (serie compartida). Si ninguno tiene, la serie es
- * el propio tipo y se numera con su código.
- */
-export function resolverSerie(
-  tipos: Tipo[],
-  tipoId: string,
-): { ownerId: string; prefijo: string | null; libro: string | null; codigo: string } {
-  const map = new Map(tipos.map((t) => [t.id, t] as const));
-  const original = map.get(tipoId);
-  let actual = original;
-  while (actual) {
-    if (actual.prefijo && actual.libro) {
-      return {
-        ownerId: actual.id,
-        prefijo: actual.prefijo,
-        libro: actual.libro,
-        codigo: actual.codigo,
-      };
-    }
-    actual = actual.parentId ? map.get(actual.parentId) : undefined;
-  }
-  return { ownerId: original?.id ?? tipoId, prefijo: null, libro: null, codigo: original?.codigo ?? "" };
-}
-
 /** Ruta completa de una carpeta: "Egresos / Nómina / Quincenal". */
 export function rutaTipo(tipos: Tipo[], id: string): string {
   const map = new Map(tipos.map((t) => [t.id, t] as const));

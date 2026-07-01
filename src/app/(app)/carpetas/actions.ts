@@ -1,13 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { tiposDocumento, expedientes, documentos } from "@/db/schema";
+import { expedientes } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
 import { registrarBitacora } from "@/lib/bitacora";
 import { guardarDocumentoSchema } from "@/lib/validacion";
 import { str } from "@/lib/form";
+import { crearTipoDocumento } from "@/server/carpetas";
+import { softDeleteExpediente } from "@/server/expedientes";
 
 /** Crea una carpeta o subcarpeta (si viene parentId). */
 export async function crearCarpeta(formData: FormData) {
@@ -15,36 +17,19 @@ export async function crearCarpeta(formData: FormData) {
   const nombre = str(formData.get("nombre"));
   if (!nombre) throw new Error("El nombre de la carpeta es obligatorio.");
   const parentId = str(formData.get("parentId"));
-  const codigo = str(formData.get("codigo")) ?? `C-${Date.now().toString(36)}`;
 
-  const [{ maxOrden }] = await db
-    .select({ maxOrden: sql<number>`coalesce(max(${tiposDocumento.orden}), 0)` })
-    .from(tiposDocumento)
-    .where(eq(tiposDocumento.empresaId, empresaId));
-
-  const [tipo] = await db
-    .insert(tiposDocumento)
-    .values({
-      empresaId,
-      codigo,
-      nombre,
-      prefijo: str(formData.get("prefijo")),
-      libro: str(formData.get("libro")),
-      parentId: parentId ?? null,
-      orden: (Number(maxOrden) || 0) + 1,
-    })
-    .returning({ id: tiposDocumento.id });
-
-  await registrarBitacora({
+  await crearTipoDocumento({
     empresaId,
     usuarioId: session.user.id,
-    accion: "crear",
-    entidad: "tipo_documento",
-    entidadId: tipo.id,
-    detalle: nombre,
+    nombre,
+    codigo: str(formData.get("codigo")),
+    prefijo: str(formData.get("prefijo")),
+    libro: str(formData.get("libro")),
+    parentId,
   });
 
   revalidatePath(parentId ? `/carpetas/${parentId}` : "/carpetas");
+  revalidatePath("/catalogo");
 }
 
 /** Guarda nombre, tipo (mueve de carpeta) y carpeta física de un documento. */
@@ -85,34 +70,13 @@ export async function guardarDocumento(formData: FormData) {
 
   const carpetaActual = str(formData.get("carpetaActual"));
   if (carpetaActual) revalidatePath(`/carpetas/${carpetaActual}`);
+  revalidatePath("/expedientes");
 }
 
-/** Elimina (soft-delete) un documento (fila) y sus soportes. Recuperable desde bitácora. */
+/** Elimina (soft-delete) un documento (fila) y sus soportes. Recuperable; queda en bitácora. */
 export async function eliminarFila(id: string, carpetaActual: string) {
   const { session, empresaId } = await requireEmpresaId();
-  const ahora = new Date();
-  await db
-    .update(documentos)
-    .set({ eliminadoEn: ahora })
-    .where(
-      and(
-        eq(documentos.expedienteId, id),
-        eq(documentos.empresaId, empresaId),
-        isNull(documentos.eliminadoEn),
-      ),
-    );
-  await db
-    .update(expedientes)
-    .set({ eliminadoEn: ahora })
-    .where(and(eq(expedientes.id, id), eq(expedientes.empresaId, empresaId)));
-
-  await registrarBitacora({
-    empresaId,
-    usuarioId: session.user.id,
-    accion: "eliminar",
-    entidad: "expediente",
-    entidadId: id,
-  });
-
+  await softDeleteExpediente({ empresaId, usuarioId: session.user.id, expedienteId: id });
   if (carpetaActual) revalidatePath(`/carpetas/${carpetaActual}`);
+  revalidatePath("/expedientes");
 }

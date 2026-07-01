@@ -1,12 +1,9 @@
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { tiposDocumento } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
-import { construirArbol, type TipoNodo } from "@/lib/tipos";
+import { cargarTipos, construirArbol, type TipoNodo } from "@/lib/tipos";
+import { INPUT_SM } from "@/components/ui";
 import { crearCategoria, crearSubcategoria, actualizarTipo, toggleActivo } from "./actions";
 
-const inp =
-  "rounded-lg border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-900";
+const inp = INPUT_SM;
 
 function Nodo({ nodo }: { nodo: TipoNodo }) {
   return (
@@ -64,11 +61,7 @@ function Nodo({ nodo }: { nodo: TipoNodo }) {
 
 export default async function CatalogoPage() {
   const { empresaId } = await requireEmpresaId();
-  const tipos = await db
-    .select()
-    .from(tiposDocumento)
-    .where(eq(tiposDocumento.empresaId, empresaId))
-    .orderBy(tiposDocumento.orden);
+  const tipos = await cargarTipos(empresaId);
   const arbol = construirArbol(tipos);
 
   return (

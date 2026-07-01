@@ -1,4 +1,5 @@
 import type { TipoNodo } from "@/lib/tipos";
+import { INPUT } from "@/components/ui";
 
 export type DatosExpediente = {
   tipoId?: string | null;
@@ -18,8 +19,7 @@ export type DatosExpediente = {
 };
 
 const label = "mb-1 block text-sm font-medium text-neutral-700";
-const input =
-  "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900";
+const input = INPUT;
 
 export function CamposExpediente({
   opciones,

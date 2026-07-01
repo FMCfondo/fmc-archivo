@@ -1,6 +1,6 @@
 "use client";
 
-import { cambiarEmpresa } from "./equipo/actions";
+import { cambiarEmpresa } from "@/app/(app)/equipo/actions";
 import type { Membresia } from "@/lib/session";
 
 export function EmpresaSwitcher({

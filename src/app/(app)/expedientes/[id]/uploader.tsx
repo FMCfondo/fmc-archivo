@@ -2,24 +2,13 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { conReintentos } from "@/lib/reintentos";
+import { subirArchivos } from "@/lib/subir-cliente";
+import { ACCEPT_ARCHIVOS } from "@/lib/constantes";
+import { ETIQUETAS_SOPORTE } from "@/lib/format";
+import { INPUT_INLINE } from "@/components/ui";
+import type { TipoSoporte } from "@/db/schema";
 
-type TipoSoporte =
-  | "principal"
-  | "factura"
-  | "soporte_pago"
-  | "registro_contable"
-  | "comprobante_bancario"
-  | "otro";
-
-const TIPOS: [TipoSoporte, string][] = [
-  ["principal", "Documento principal"],
-  ["factura", "Factura"],
-  ["soporte_pago", "Soporte de pago"],
-  ["registro_contable", "Registro contable"],
-  ["comprobante_bancario", "Comprobante bancario"],
-  ["otro", "Otro"],
-];
+const TIPOS = Object.entries(ETIQUETAS_SOPORTE) as [TipoSoporte, string][];
 
 export function Uploader({ expedienteId }: { expedienteId: string }) {
   const router = useRouter();
@@ -33,23 +22,7 @@ export function Uploader({ expedienteId }: { expedienteId: string }) {
     if (files.length === 0) return;
     setSubiendo(true);
     setError(null);
-    const fallos: string[] = [];
-    for (const file of files) {
-      try {
-        const fd = new FormData();
-        fd.set("file", file);
-        fd.set("expedienteId", expedienteId);
-        fd.set("tipoSoporte", tipo);
-        await conReintentos(async () => {
-          const r = await fetch("/api/subir", { method: "POST", body: fd });
-          if (!r.ok) {
-            throw new Error(r.status === 413 ? "archivo muy grande (máx ~4.5 MB)" : `servidor ${r.status}`);
-          }
-        });
-      } catch (err) {
-        fallos.push(`${file.name}: ${err instanceof Error ? err.message : "error"}`);
-      }
-    }
+    const fallos = await subirArchivos(files, { expedienteId, tipoSoporte: tipo });
     setSubiendo(false);
     if (inputRef.current) inputRef.current.value = "";
     if (fallos.length) setError(`Fallaron ${fallos.length}: ${fallos.join(" | ")}`);
@@ -63,7 +36,7 @@ export function Uploader({ expedienteId }: { expedienteId: string }) {
           value={tipo}
           onChange={(e) => setTipo(e.target.value as TipoSoporte)}
           disabled={subiendo}
-          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+          className={INPUT_INLINE}
         >
           {TIPOS.map(([v, l]) => (
             <option key={v} value={v}>
@@ -75,7 +48,7 @@ export function Uploader({ expedienteId }: { expedienteId: string }) {
           ref={inputRef}
           type="file"
           multiple
-          accept="application/pdf,image/*"
+          accept={ACCEPT_ARCHIVOS}
           onChange={onChange}
           disabled={subiendo}
           className="text-sm text-neutral-600 file:mr-3 file:rounded-lg file:border-0 file:bg-neutral-900 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-neutral-800"
@@ -83,7 +56,7 @@ export function Uploader({ expedienteId }: { expedienteId: string }) {
         {subiendo && <span className="text-sm text-neutral-500">Subiendo…</span>}
       </div>
       <p className="mt-2 text-xs text-neutral-400">
-        Solo PDF e imágenes. Elige el tipo de soporte antes de seleccionar.
+        Solo PDF e imágenes (JPG, PNG). Elige el tipo de soporte antes de seleccionar.
       </p>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </div>

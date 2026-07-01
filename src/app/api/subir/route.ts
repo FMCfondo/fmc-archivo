@@ -1,53 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { and, eq, isNull, sql } from "drizzle-orm";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { db } from "@/db";
-import { consecutivos, documentos, expedientes } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
-import { cargarTipos, resolverSerie } from "@/lib/tipos";
-import { r2, R2_BUCKET } from "@/lib/r2";
-import { registrarBitacora } from "@/lib/bitacora";
+import { r2, R2_BUCKET, eliminarObjeto } from "@/lib/r2";
 import { detectarTipoReal } from "@/lib/validar-archivo";
 import { subirArchivoSchema } from "@/lib/validacion";
 import { MAX_SUBIDA_BYTES, MAX_SUBIDA_TEXTO } from "@/lib/constantes";
+import { crearExpedienteNuevo } from "@/server/expedientes";
+import { registrarSoporte } from "@/server/documentos";
 
 export const runtime = "nodejs";
-
-async function crearExpedienteEnCarpeta(
-  empresaId: string,
-  userId: string,
-  tipoId: string,
-  nombre: string,
-) {
-  const tipos = await cargarTipos(empresaId);
-  const serie = resolverSerie(tipos, tipoId);
-  const [c] = await db
-    .insert(consecutivos)
-    .values({ empresaId, tipoId: serie.ownerId, ultimo: 1 })
-    .onConflictDoUpdate({
-      target: [consecutivos.empresaId, consecutivos.tipoId],
-      set: { ultimo: sql`${consecutivos.ultimo} + 1` },
-    })
-    .returning({ ultimo: consecutivos.ultimo });
-  const numero = c.ultimo;
-  const consecutivo =
-    serie.prefijo && serie.libro
-      ? `${serie.prefijo}-${serie.libro}-${numero}`
-      : `${serie.codigo}-${numero}`;
-  const [exp] = await db
-    .insert(expedientes)
-    .values({ empresaId, tipoId, consecutivo, numero, concepto: nombre, creadoPor: userId })
-    .returning({ id: expedientes.id });
-
-  await registrarBitacora({
-    empresaId,
-    usuarioId: userId,
-    accion: "crear",
-    entidad: "expediente",
-    entidadId: exp.id,
-  });
-  return exp.id;
-}
 
 export async function POST(req: NextRequest) {
   const { session, empresaId } = await requireEmpresaId();
@@ -87,24 +48,15 @@ export async function POST(req: NextRequest) {
 
   let expedienteId: string;
   if (tipoId) {
-    const nombre = file.name.replace(/\.[^.]+$/, "");
-    expedienteId = await crearExpedienteEnCarpeta(empresaId, session.user.id, tipoId, nombre);
+    // Crea el documento (expediente) en la carpeta, con su consecutivo y bitácora.
+    expedienteId = await crearExpedienteNuevo({
+      empresaId,
+      usuarioId: session.user.id,
+      tipoId,
+      campos: { concepto: file.name.replace(/\.[^.]+$/, "") },
+    });
   } else if (expedienteIdForm) {
-    const exp = (
-      await db
-        .select({ id: expedientes.id })
-        .from(expedientes)
-        .where(
-          and(
-            eq(expedientes.id, expedienteIdForm),
-            eq(expedientes.empresaId, empresaId),
-            isNull(expedientes.eliminadoEn),
-          ),
-        )
-        .limit(1)
-    )[0];
-    if (!exp) return NextResponse.json({ error: "Expediente no encontrado." }, { status: 404 });
-    expedienteId = expedienteIdForm;
+    expedienteId = expedienteIdForm; // registrarSoporte valida que exista, sea de la empresa y esté vivo
   } else {
     return NextResponse.json({ error: "Falta el destino del archivo." }, { status: 400 });
   }
@@ -116,28 +68,30 @@ export async function POST(req: NextRequest) {
     new PutObjectCommand({ Bucket: R2_BUCKET, Key: key, Body: bytes, ContentType: mimeReal }),
   );
 
-  const [doc] = await db
-    .insert(documentos)
-    .values({
-      expedienteId,
+  try {
+    await registrarSoporte({
       empresaId,
+      usuarioId: session.user.id,
+      expedienteId,
       tipoSoporte: tipoId ? "principal" : (tipoSoporte ?? "otro"),
       nombreArchivo: file.name,
       r2Key: key,
       mime: mimeReal,
       tamano: file.size,
-      subidoPor: session.user.id,
-    })
-    .returning({ id: documentos.id });
-
-  await registrarBitacora({
-    empresaId,
-    usuarioId: session.user.id,
-    accion: "subir_documento",
-    entidad: "documento",
-    entidadId: doc.id,
-    detalle: file.name,
-  });
+    });
+  } catch (err) {
+    // Compensación: si el registro en BD falla, no dejamos el archivo huérfano en R2.
+    try {
+      await eliminarObjeto(key);
+    } catch {
+      // el objeto huérfano se reporta pero no bloquea la respuesta de error
+      console.error("No se pudo limpiar el objeto huérfano de R2:", key);
+    }
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "No se pudo registrar el archivo." },
+      { status: 404 },
+    );
+  }
 
   return NextResponse.json({ ok: true, expedienteId });
 }
