@@ -8,11 +8,8 @@ import bcrypt from "bcryptjs";
 import { db } from "@/db";
 import { empresas, usuarios, usuariosEmpresas } from "@/db/schema";
 import { requireSession, requireAdmin, type Rol } from "@/lib/session";
-
-function str(v: FormDataEntryValue | null): string | null {
-  const s = typeof v === "string" ? v.trim() : "";
-  return s.length ? s : null;
-}
+import { str } from "@/lib/form";
+import { BCRYPT_COST, MIN_PASSWORD, RUTA_INICIO } from "@/lib/constantes";
 
 /** Cambia la empresa activa (guarda la elección en una cookie). */
 export async function cambiarEmpresa(formData: FormData) {
@@ -38,7 +35,7 @@ export async function cambiarEmpresa(formData: FormData) {
     sameSite: "lax",
   });
   revalidatePath("/", "layout");
-  redirect("/inicio");
+  redirect(RUTA_INICIO);
 }
 
 /** Crea una nueva empresa y deja al usuario actual como admin. */
@@ -55,7 +52,7 @@ export async function crearEmpresa(formData: FormData) {
     .values({ usuarioId: session.user.id, empresaId: emp.id, rol: "admin" });
   (await cookies()).set("empresaActiva", emp.id, { path: "/", httpOnly: true, sameSite: "lax" });
   revalidatePath("/", "layout");
-  redirect("/inicio");
+  redirect(RUTA_INICIO);
 }
 
 /** Renombra/actualiza la empresa activa (solo admin). */
@@ -82,13 +79,15 @@ export async function agregarMiembro(formData: FormData) {
 
   let user = (await db.select().from(usuarios).where(eq(usuarios.email, email)).limit(1))[0];
   if (!user) {
-    if (password.length < 6) {
-      throw new Error("Para un usuario nuevo, la contraseña temporal debe tener al menos 6 caracteres.");
+    if (password.length < MIN_PASSWORD) {
+      throw new Error(
+        `Para un usuario nuevo, la contraseña temporal debe tener al menos ${MIN_PASSWORD} caracteres.`,
+      );
     }
     user = (
       await db
         .insert(usuarios)
-        .values({ email, nombre, passwordHash: await bcrypt.hash(password, 10) })
+        .values({ email, nombre, passwordHash: await bcrypt.hash(password, BCRYPT_COST) })
         .returning()
     )[0];
   }

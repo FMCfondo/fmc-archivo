@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { usuarios } from "@/db/schema";
 import { requireSession } from "@/lib/session";
+import { BCRYPT_COST, MIN_PASSWORD } from "@/lib/constantes";
 
 export type EstadoCambio = { error?: string; ok?: boolean };
 
@@ -17,7 +18,9 @@ export async function cambiarPassword(
   const nueva = String(formData.get("nueva") ?? "");
   const confirmar = String(formData.get("confirmar") ?? "");
 
-  if (nueva.length < 8) return { error: "La nueva contraseña debe tener al menos 8 caracteres." };
+  if (nueva.length < MIN_PASSWORD) {
+    return { error: `La nueva contraseña debe tener al menos ${MIN_PASSWORD} caracteres.` };
+  }
   if (nueva !== confirmar) return { error: "La confirmación no coincide." };
 
   const user = (
@@ -32,7 +35,7 @@ export async function cambiarPassword(
 
   await db
     .update(usuarios)
-    .set({ passwordHash: await bcrypt.hash(nueva, 10), debeCambiarPassword: false })
+    .set({ passwordHash: await bcrypt.hash(nueva, BCRYPT_COST), debeCambiarPassword: false })
     .where(eq(usuarios.id, session.user.id));
 
   return { ok: true };

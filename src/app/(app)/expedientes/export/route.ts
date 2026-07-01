@@ -3,8 +3,8 @@ import { and, desc, eq, ilike, isNull, or, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { expedientes, tiposDocumento } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
-
-type EstadoExpediente = "pendiente" | "completo" | "fusionado";
+import { LIMITE_EXPORT } from "@/lib/constantes";
+import type { EstadoExpediente } from "@/db/schema";
 
 function cell(v: unknown): string {
   if (v == null) return "";
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     .innerJoin(tiposDocumento, eq(expedientes.tipoId, tiposDocumento.id))
     .where(and(...conds))
     .orderBy(desc(expedientes.creadoEn))
-    .limit(5000);
+    .limit(LIMITE_EXPORT);
 
   const encabezados = [
     "Consecutivo",

@@ -9,6 +9,7 @@ import { r2, R2_BUCKET } from "@/lib/r2";
 import { registrarBitacora } from "@/lib/bitacora";
 import { detectarTipoReal } from "@/lib/validar-archivo";
 import { subirArchivoSchema } from "@/lib/validacion";
+import { MAX_SUBIDA_BYTES, MAX_SUBIDA_TEXTO } from "@/lib/constantes";
 
 export const runtime = "nodejs";
 
@@ -67,8 +68,15 @@ export async function POST(req: NextRequest) {
   }
   const { tipoId, expedienteId: expedienteIdForm, tipoSoporte } = entrada.data;
 
-  // Valida el contenido REAL del archivo (magic bytes), no lo que diga el navegador.
   const bytes = new Uint8Array(await file.arrayBuffer());
+  // Límite propio (no solo el implícito de la plataforma), con respuesta 413 clara.
+  if (bytes.length > MAX_SUBIDA_BYTES) {
+    return NextResponse.json(
+      { error: `El archivo supera el máximo de ${MAX_SUBIDA_TEXTO}.` },
+      { status: 413 },
+    );
+  }
+  // Valida el contenido REAL del archivo (magic bytes), no lo que diga el navegador.
   const mimeReal = detectarTipoReal(bytes);
   if (!mimeReal) {
     return NextResponse.json(

@@ -31,6 +31,12 @@ export const tipoSoporteEnum = pgEnum("tipo_soporte", [
   "otro",
 ]);
 
+// Tipos TS derivados de los enums de la BD — única fuente de verdad.
+// Al agregar un valor al pgEnum, todos los usos se actualizan (o fallan en compilación).
+export type Rol = (typeof rolEnum.enumValues)[number];
+export type EstadoExpediente = (typeof estadoExpedienteEnum.enumValues)[number];
+export type TipoSoporte = (typeof tipoSoporteEnum.enumValues)[number];
+
 // ---------- Empresas (tenants) ----------
 export const empresas = pgTable("empresas", {
   id: uuid("id").defaultRandom().primaryKey(),

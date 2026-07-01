@@ -6,7 +6,7 @@ import { expedientes, tiposDocumento, documentos } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
 import { formatCOP, ETIQUETAS_ESTADO } from "@/lib/format";
 import { Uploader } from "./uploader";
-import { DocumentoFila } from "./documento-fila";
+import { FilaSoporte } from "./fila-soporte";
 import { EliminarExpedienteBtn } from "./eliminar-btn";
 
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: React.ReactNode }) {
@@ -156,7 +156,7 @@ export default async function DetalleExpedientePage({
             </p>
           )}
           {docs.map((d) => (
-            <DocumentoFila
+            <FilaSoporte
               key={d.id}
               doc={{
                 id: d.id,

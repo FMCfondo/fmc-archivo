@@ -109,7 +109,7 @@ export function FilaDocumento({
   }
 
   async function borrar() {
-    if (!confirm("¿Eliminar este documento y todos sus archivos? No se puede deshacer.")) return;
+    if (!confirm("Se eliminará este documento y sus soportes. Un administrador podrá recuperarlo. ¿Continuar?")) return;
     await eliminarFila(doc.id, carpetaActual);
     router.refresh();
   }

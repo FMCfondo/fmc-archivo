@@ -7,11 +7,7 @@ import { tiposDocumento, expedientes, documentos } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
 import { registrarBitacora } from "@/lib/bitacora";
 import { guardarDocumentoSchema } from "@/lib/validacion";
-
-function str(v: FormDataEntryValue | null): string | null {
-  const s = typeof v === "string" ? v.trim() : "";
-  return s.length ? s : null;
-}
+import { str } from "@/lib/form";
 
 /** Crea una carpeta o subcarpeta (si viene parentId). */
 export async function crearCarpeta(formData: FormData) {
@@ -98,7 +94,13 @@ export async function eliminarFila(id: string, carpetaActual: string) {
   await db
     .update(documentos)
     .set({ eliminadoEn: ahora })
-    .where(and(eq(documentos.expedienteId, id), eq(documentos.empresaId, empresaId)));
+    .where(
+      and(
+        eq(documentos.expedienteId, id),
+        eq(documentos.empresaId, empresaId),
+        isNull(documentos.eliminadoEn),
+      ),
+    );
   await db
     .update(expedientes)
     .set({ eliminadoEn: ahora })

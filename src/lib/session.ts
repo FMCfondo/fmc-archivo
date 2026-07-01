@@ -3,9 +3,10 @@ import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { usuariosEmpresas, empresas } from "@/db/schema";
+import { usuariosEmpresas, empresas, type Rol } from "@/db/schema";
+import { RUTA_INICIO } from "@/lib/constantes";
 
-export type Rol = "admin" | "editor" | "lector";
+export type { Rol };
 export type Membresia = { empresaId: string; rol: Rol; nombre: string };
 
 /** Devuelve la sesión o redirige al login. */
@@ -48,6 +49,6 @@ export async function requireEmpresaId() {
 /** Igual que requireEmpresaId pero exige rol admin en la empresa activa. */
 export async function requireAdmin() {
   const ctx = await requireEmpresaId();
-  if (ctx.rol !== "admin") redirect("/inicio");
+  if (ctx.rol !== "admin") redirect(RUTA_INICIO);
   return ctx;
 }

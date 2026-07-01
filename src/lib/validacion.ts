@@ -1,15 +1,10 @@
 import { z } from "zod";
+import { estadoExpedienteEnum, tipoSoporteEnum } from "@/db/schema";
 
 export const uuidSchema = z.string().uuid();
-export const tipoSoporteSchema = z.enum([
-  "principal",
-  "factura",
-  "soporte_pago",
-  "registro_contable",
-  "comprobante_bancario",
-  "otro",
-]);
-export const estadoExpedienteSchema = z.enum(["pendiente", "completo", "fusionado"]);
+// Derivados de los pgEnum del schema: un valor nuevo en la BD se acepta aquí automáticamente.
+export const tipoSoporteSchema = z.enum(tipoSoporteEnum.enumValues);
+export const estadoExpedienteSchema = z.enum(estadoExpedienteEnum.enumValues);
 
 /** Campos de un expediente: valida formato sin ser demasiado estricta (todo es opcional). */
 export const camposExpedienteSchema = z.object({

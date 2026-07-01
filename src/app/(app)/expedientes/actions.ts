@@ -10,13 +10,8 @@ import { cargarTipos, resolverSerie } from "@/lib/tipos";
 import { urlDescarga } from "@/lib/r2";
 import { registrarBitacora } from "@/lib/bitacora";
 import { camposExpedienteSchema } from "@/lib/validacion";
-
-type EstadoExpediente = "pendiente" | "completo" | "fusionado";
-
-function str(v: FormDataEntryValue | null): string | null {
-  const s = typeof v === "string" ? v.trim() : "";
-  return s.length ? s : null;
-}
+import { str } from "@/lib/form";
+import type { EstadoExpediente } from "@/db/schema";
 
 /** Genera/aplica el consecutivo de la serie del tipo, respetando un override. */
 async function resolverConsecutivo(
@@ -156,7 +151,13 @@ export async function eliminarExpediente(formData: FormData) {
   await db
     .update(documentos)
     .set({ eliminadoEn: ahora })
-    .where(and(eq(documentos.expedienteId, id), eq(documentos.empresaId, empresaId)));
+    .where(
+      and(
+        eq(documentos.expedienteId, id),
+        eq(documentos.empresaId, empresaId),
+        isNull(documentos.eliminadoEn),
+      ),
+    );
   await db
     .update(expedientes)
     .set({ eliminadoEn: ahora })

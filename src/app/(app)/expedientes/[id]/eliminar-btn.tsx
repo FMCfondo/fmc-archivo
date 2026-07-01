@@ -7,7 +7,7 @@ export function EliminarExpedienteBtn({ id }: { id: string }) {
     <form
       action={eliminarExpediente}
       onSubmit={(e) => {
-        if (!confirm("¿Eliminar este expediente y todos sus documentos? No se puede deshacer.")) {
+        if (!confirm("Se eliminará este expediente y todos sus documentos. Un administrador podrá recuperarlo. ¿Continuar?")) {
           e.preventDefault();
         }
       }}

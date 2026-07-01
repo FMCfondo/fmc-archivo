@@ -5,11 +5,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { tiposDocumento } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
-
-function str(v: FormDataEntryValue | null): string | null {
-  const s = typeof v === "string" ? v.trim() : "";
-  return s.length ? s : null;
-}
+import { str } from "@/lib/form";
 
 async function siguienteOrden(empresaId: string): Promise<number> {
   const r = await db

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { RUTA_INICIO } from "@/lib/constantes";
 
 export default auth((req) => {
   const { nextUrl } = req;
@@ -39,7 +40,7 @@ export default auth((req) => {
     return conCabeceras(NextResponse.redirect(new URL("/login", nextUrl)));
   }
   if (isLoggedIn && isLoginPage) {
-    return conCabeceras(NextResponse.redirect(new URL("/carpetas", nextUrl)));
+    return conCabeceras(NextResponse.redirect(new URL(RUTA_INICIO, nextUrl)));
   }
   if (isLoggedIn && session.user.debeCambiarPassword && !isCuenta) {
     return conCabeceras(NextResponse.redirect(new URL("/cuenta", nextUrl)));

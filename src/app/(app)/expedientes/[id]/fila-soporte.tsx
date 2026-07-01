@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { obtenerUrlDescarga, eliminarDocumento } from "../actions";
 import { ETIQUETAS_SOPORTE, formatTamano } from "@/lib/format";
 
-export function DocumentoFila({
+/** Fila de un soporte/archivo (tabla `documentos`) dentro del detalle de un expediente. */
+export function FilaSoporte({
   doc,
 }: {
   doc: { id: string; nombreArchivo: string; tipoSoporte: string; tamano: number | null };
@@ -24,7 +25,7 @@ export function DocumentoFila({
   }
 
   async function borrar() {
-    if (!confirm("¿Eliminar este documento? No se puede deshacer.")) return;
+    if (!confirm("Se eliminará este soporte. Un administrador podrá recuperarlo. ¿Continuar?")) return;
     setTrabajando(true);
     try {
       await eliminarDocumento(doc.id);

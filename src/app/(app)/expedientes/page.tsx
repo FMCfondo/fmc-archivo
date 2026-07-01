@@ -4,8 +4,8 @@ import { db } from "@/db";
 import { expedientes, tiposDocumento } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
 import { formatCOP, ETIQUETAS_ESTADO } from "@/lib/format";
-
-type EstadoExpediente = "pendiente" | "completo" | "fusionado";
+import { LIMITE_LISTADO } from "@/lib/constantes";
+import type { EstadoExpediente } from "@/db/schema";
 
 export default async function ExpedientesPage({
   searchParams,
@@ -57,7 +57,7 @@ export default async function ExpedientesPage({
     .innerJoin(tiposDocumento, eq(expedientes.tipoId, tiposDocumento.id))
     .where(and(...conds))
     .orderBy(desc(expedientes.creadoEn))
-    .limit(300);
+    .limit(LIMITE_LISTADO);
 
   const inputCls =
     "rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900";
@@ -153,7 +153,7 @@ export default async function ExpedientesPage({
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-neutral-400">Mostrando hasta 300 resultados.</p>
+      <p className="text-xs text-neutral-400">Mostrando hasta {LIMITE_LISTADO} resultados.</p>
     </div>
   );
 }
