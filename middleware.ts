@@ -5,10 +5,13 @@ export default auth((req) => {
   const { nextUrl } = req;
   const session = req.auth;
 
-  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  // Next.js no aplica el nonce a sus propios scripts (verificado: no aparece en el HTML
+  // servido), así que un CSP nonce+strict-dynamic estricto rompería la hidratación de la
+  // app. Usamos 'unsafe-inline' para script/style (permite los scripts propios de Next),
+  // mientras seguimos bloqueando orígenes externos, iframes, plugins y mixed content.
   const csp = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    script-src 'self' 'unsafe-inline';
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data:;
     font-src 'self' data:;
@@ -42,9 +45,7 @@ export default auth((req) => {
     return conCabeceras(NextResponse.redirect(new URL("/cuenta", nextUrl)));
   }
 
-  const requestHeaders = new Headers(req.headers);
-  requestHeaders.set("x-nonce", nonce);
-  return conCabeceras(NextResponse.next({ request: { headers: requestHeaders } }));
+  return conCabeceras(NextResponse.next());
 });
 
 export const config = {
