@@ -17,7 +17,7 @@ export async function cambiarPassword(
   const nueva = String(formData.get("nueva") ?? "");
   const confirmar = String(formData.get("confirmar") ?? "");
 
-  if (nueva.length < 6) return { error: "La nueva contraseña debe tener al menos 6 caracteres." };
+  if (nueva.length < 8) return { error: "La nueva contraseña debe tener al menos 8 caracteres." };
   if (nueva !== confirmar) return { error: "La confirmación no coincide." };
 
   const user = (
@@ -26,10 +26,13 @@ export async function cambiarPassword(
   if (!user || !(await bcrypt.compare(actual, user.passwordHash))) {
     return { error: "La contraseña actual es incorrecta." };
   }
+  if (await bcrypt.compare(nueva, user.passwordHash)) {
+    return { error: "La nueva contraseña debe ser diferente a la actual." };
+  }
 
   await db
     .update(usuarios)
-    .set({ passwordHash: await bcrypt.hash(nueva, 10) })
+    .set({ passwordHash: await bcrypt.hash(nueva, 10), debeCambiarPassword: false })
     .where(eq(usuarios.id, session.user.id));
 
   return { ok: true };

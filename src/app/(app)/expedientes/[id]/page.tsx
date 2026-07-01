@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { expedientes, tiposDocumento, documentos } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
@@ -49,7 +49,9 @@ export default async function DetalleExpedientePage({
       })
       .from(expedientes)
       .innerJoin(tiposDocumento, eq(expedientes.tipoId, tiposDocumento.id))
-      .where(and(eq(expedientes.id, id), eq(expedientes.empresaId, empresaId)))
+      .where(
+        and(eq(expedientes.id, id), eq(expedientes.empresaId, empresaId), isNull(expedientes.eliminadoEn)),
+      )
       .limit(1)
   )[0];
 
@@ -58,7 +60,7 @@ export default async function DetalleExpedientePage({
   const docs = await db
     .select()
     .from(documentos)
-    .where(eq(documentos.expedienteId, id))
+    .where(and(eq(documentos.expedienteId, id), isNull(documentos.eliminadoEn)))
     .orderBy(asc(documentos.subidoEn));
 
   return (

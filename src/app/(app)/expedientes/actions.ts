@@ -2,12 +2,14 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { consecutivos, documentos, expedientes } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
 import { cargarTipos, resolverSerie } from "@/lib/tipos";
-import { urlSubida, urlDescarga, eliminarObjeto } from "@/lib/r2";
+import { urlSubida, urlDescarga } from "@/lib/r2";
+import { registrarBitacora } from "@/lib/bitacora";
+import { camposExpedienteSchema } from "@/lib/validacion";
 
 type TipoSoporte =
   | "principal"
@@ -66,7 +68,7 @@ async function resolverConsecutivo(
 }
 
 function leerCampos(formData: FormData) {
-  return {
+  const crudo = {
     periodo: str(formData.get("periodo")),
     fecha: str(formData.get("fecha")),
     tercero: str(formData.get("tercero")),
@@ -74,12 +76,14 @@ function leerCampos(formData: FormData) {
     concepto: str(formData.get("concepto")),
     valor: str(formData.get("valor")),
     estado: (str(formData.get("estado")) ?? "pendiente") as EstadoExpediente,
-    tieneCarpetaFisica: formData.get("tieneCarpetaFisica") === "on",
     rotuloCarpeta: str(formData.get("rotuloCarpeta")),
     ubicacionFisica: str(formData.get("ubicacionFisica")),
     folio: str(formData.get("folio")),
     notas: str(formData.get("notas")),
   };
+  const r = camposExpedienteSchema.safeParse(crudo);
+  if (!r.success) throw new Error(r.error.issues[0]?.message ?? "Datos inválidos.");
+  return { ...r.data, tieneCarpetaFisica: formData.get("tieneCarpetaFisica") === "on" };
 }
 
 /** Crea un expediente (consecutivo automático o el que indique el usuario). */
@@ -106,13 +110,21 @@ export async function crearExpediente(formData: FormData) {
     })
     .returning({ id: expedientes.id });
 
+  await registrarBitacora({
+    empresaId,
+    usuarioId: session.user.id,
+    accion: "crear",
+    entidad: "expediente",
+    entidadId: exp.id,
+  });
+
   revalidatePath("/expedientes");
   redirect(`/expedientes/${exp.id}`);
 }
 
 /** Edita los datos de un expediente (incluido el consecutivo). */
 export async function editarExpediente(formData: FormData) {
-  const { empresaId } = await requireEmpresaId();
+  const { session, empresaId } = await requireEmpresaId();
   const id = str(formData.get("id"));
   if (!id) throw new Error("Falta el identificador del expediente.");
   const tipoId = str(formData.get("tipoId"));
@@ -125,31 +137,46 @@ export async function editarExpediente(formData: FormData) {
       ...leerCampos(formData),
       actualizadoEn: new Date(),
     })
-    .where(and(eq(expedientes.id, id), eq(expedientes.empresaId, empresaId)));
+    .where(
+      and(eq(expedientes.id, id), eq(expedientes.empresaId, empresaId), isNull(expedientes.eliminadoEn)),
+    );
+
+  await registrarBitacora({
+    empresaId,
+    usuarioId: session.user.id,
+    accion: "editar",
+    entidad: "expediente",
+    entidadId: id,
+  });
 
   revalidatePath(`/expedientes/${id}`);
   redirect(`/expedientes/${id}`);
 }
 
-/** Elimina un expediente y todos sus documentos (también de R2). */
+/** Elimina (soft-delete) un expediente y sus documentos. Queda en bitácora y es recuperable. */
 export async function eliminarExpediente(formData: FormData) {
-  const { empresaId } = await requireEmpresaId();
+  const { session, empresaId } = await requireEmpresaId();
   const id = str(formData.get("id"));
   if (!id) return;
 
-  const docs = await db
-    .select({ r2Key: documentos.r2Key })
-    .from(documentos)
+  const ahora = new Date();
+  await db
+    .update(documentos)
+    .set({ eliminadoEn: ahora })
     .where(and(eq(documentos.expedienteId, id), eq(documentos.empresaId, empresaId)));
-  for (const d of docs) {
-    try {
-      await eliminarObjeto(d.r2Key);
-    } catch {
-      // continúa aunque falle el borrado de un archivo
-    }
-  }
+  await db
+    .update(expedientes)
+    .set({ eliminadoEn: ahora })
+    .where(and(eq(expedientes.id, id), eq(expedientes.empresaId, empresaId)));
 
-  await db.delete(expedientes).where(and(eq(expedientes.id, id), eq(expedientes.empresaId, empresaId)));
+  await registrarBitacora({
+    empresaId,
+    usuarioId: session.user.id,
+    accion: "eliminar",
+    entidad: "expediente",
+    entidadId: id,
+  });
+
   revalidatePath("/expedientes");
   redirect("/expedientes");
 }
@@ -178,21 +205,40 @@ export async function registrarDocumento(input: {
     await db
       .select({ id: expedientes.id })
       .from(expedientes)
-      .where(and(eq(expedientes.id, input.expedienteId), eq(expedientes.empresaId, empresaId)))
+      .where(
+        and(
+          eq(expedientes.id, input.expedienteId),
+          eq(expedientes.empresaId, empresaId),
+          isNull(expedientes.eliminadoEn),
+        ),
+      )
       .limit(1)
   )[0];
   if (!exp) throw new Error("Expediente no encontrado.");
 
-  await db.insert(documentos).values({
-    expedienteId: input.expedienteId,
+  const [doc] = await db
+    .insert(documentos)
+    .values({
+      expedienteId: input.expedienteId,
+      empresaId,
+      tipoSoporte: input.tipoSoporte,
+      nombreArchivo: input.nombreArchivo,
+      r2Key: input.r2Key,
+      mime: input.mime,
+      tamano: input.tamano,
+      subidoPor: session.user.id,
+    })
+    .returning({ id: documentos.id });
+
+  await registrarBitacora({
     empresaId,
-    tipoSoporte: input.tipoSoporte,
-    nombreArchivo: input.nombreArchivo,
-    r2Key: input.r2Key,
-    mime: input.mime,
-    tamano: input.tamano,
-    subidoPor: session.user.id,
+    usuarioId: session.user.id,
+    accion: "subir_documento",
+    entidad: "documento",
+    entidadId: doc.id,
+    detalle: input.nombreArchivo,
   });
+
   revalidatePath(`/expedientes/${input.expedienteId}`);
 }
 
@@ -203,30 +249,43 @@ export async function obtenerUrlDescarga(documentoId: string) {
     await db
       .select({ r2Key: documentos.r2Key })
       .from(documentos)
-      .where(and(eq(documentos.id, documentoId), eq(documentos.empresaId, empresaId)))
+      .where(
+        and(
+          eq(documentos.id, documentoId),
+          eq(documentos.empresaId, empresaId),
+          isNull(documentos.eliminadoEn),
+        ),
+      )
       .limit(1)
   )[0];
   if (!doc) throw new Error("Documento no encontrado.");
   return urlDescarga(doc.r2Key);
 }
 
-/** Elimina un documento (de R2 y de la BD). */
+/** Elimina (soft-delete) un documento. El archivo en R2 se conserva para poder recuperarlo. */
 export async function eliminarDocumento(documentoId: string) {
-  const { empresaId } = await requireEmpresaId();
+  const { session, empresaId } = await requireEmpresaId();
   const doc = (
     await db
-      .select({ r2Key: documentos.r2Key, expedienteId: documentos.expedienteId })
+      .select({ expedienteId: documentos.expedienteId })
       .from(documentos)
       .where(and(eq(documentos.id, documentoId), eq(documentos.empresaId, empresaId)))
       .limit(1)
   )[0];
   if (!doc) return;
 
-  try {
-    await eliminarObjeto(doc.r2Key);
-  } catch {
-    // igual quitamos el registro
-  }
-  await db.delete(documentos).where(eq(documentos.id, documentoId));
+  await db
+    .update(documentos)
+    .set({ eliminadoEn: new Date() })
+    .where(and(eq(documentos.id, documentoId), eq(documentos.empresaId, empresaId)));
+
+  await registrarBitacora({
+    empresaId,
+    usuarioId: session.user.id,
+    accion: "eliminar_documento",
+    entidad: "documento",
+    entidadId: documentoId,
+  });
+
   revalidatePath(`/expedientes/${doc.expedienteId}`);
 }

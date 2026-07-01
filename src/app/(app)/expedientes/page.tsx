@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, desc, eq, ilike, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, ilike, isNull, or, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { expedientes, tiposDocumento } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
@@ -24,7 +24,7 @@ export default async function ExpedientesPage({
     .where(eq(tiposDocumento.empresaId, empresaId))
     .orderBy(tiposDocumento.orden);
 
-  const conds: SQL[] = [eq(expedientes.empresaId, empresaId)];
+  const conds: SQL[] = [eq(expedientes.empresaId, empresaId), isNull(expedientes.eliminadoEn)];
   if (sp.tipoId) conds.push(eq(expedientes.tipoId, sp.tipoId));
   if (sp.periodo) conds.push(eq(expedientes.periodo, sp.periodo));
   if (sp.estado) conds.push(eq(expedientes.estado, sp.estado as EstadoExpediente));

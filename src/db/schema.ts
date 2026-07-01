@@ -45,8 +45,56 @@ export const usuarios = pgTable("usuarios", {
   email: text("email").notNull().unique(),
   nombre: text("nombre").notNull(),
   passwordHash: text("password_hash").notNull(),
+  debeCambiarPassword: boolean("debe_cambiar_password").notNull().default(true),
   creadoEn: timestamp("creado_en", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ---------- Intentos de login (rate limiting anti fuerza-bruta) ----------
+export const intentosLogin = pgTable(
+  "intentos_login",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    email: text("email").notNull(),
+    exitoso: boolean("exitoso").notNull(),
+    creadoEn: timestamp("creado_en", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("idx_intentos_email_fecha").on(t.email, t.creadoEn)],
+);
+
+// ---------- Bitácora de auditoría (quién hizo qué, cuándo) ----------
+export const bitacoraAccionEnum = pgEnum("bitacora_accion", [
+  "crear",
+  "editar",
+  "eliminar",
+  "subir_documento",
+  "eliminar_documento",
+  "mover",
+]);
+export const bitacoraEntidadEnum = pgEnum("bitacora_entidad", [
+  "expediente",
+  "documento",
+  "tipo_documento",
+]);
+
+export const bitacora = pgTable(
+  "bitacora",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    empresaId: uuid("empresa_id")
+      .notNull()
+      .references(() => empresas.id, { onDelete: "cascade" }),
+    usuarioId: uuid("usuario_id").references(() => usuarios.id),
+    accion: bitacoraAccionEnum("accion").notNull(),
+    entidad: bitacoraEntidadEnum("entidad").notNull(),
+    entidadId: uuid("entidad_id").notNull(),
+    detalle: text("detalle"),
+    creadoEn: timestamp("creado_en", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_bitacora_empresa").on(t.empresaId, t.creadoEn),
+    index("idx_bitacora_entidad").on(t.entidad, t.entidadId),
+  ],
+);
 
 // ---------- Membresía usuario <-> empresa (con rol) ----------
 export const usuariosEmpresas = pgTable(
@@ -129,6 +177,7 @@ export const expedientes = pgTable(
     creadoPor: uuid("creado_por").references(() => usuarios.id),
     creadoEn: timestamp("creado_en", { withTimezone: true }).defaultNow().notNull(),
     actualizadoEn: timestamp("actualizado_en", { withTimezone: true }).defaultNow().notNull(),
+    eliminadoEn: timestamp("eliminado_en", { withTimezone: true }),
   },
   (t) => [
     index("idx_exp_empresa").on(t.empresaId),
@@ -156,6 +205,7 @@ export const documentos = pgTable(
     tamano: integer("tamano"), // bytes
     subidoPor: uuid("subido_por").references(() => usuarios.id),
     subidoEn: timestamp("subido_en", { withTimezone: true }).defaultNow().notNull(),
+    eliminadoEn: timestamp("eliminado_en", { withTimezone: true }),
   },
   (t) => [index("idx_doc_expediente").on(t.expedienteId)],
 );

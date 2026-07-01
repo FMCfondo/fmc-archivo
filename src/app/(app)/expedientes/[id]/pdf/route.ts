@@ -1,5 +1,5 @@
 import { type NextRequest } from "next/server";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { PDFDocument } from "pdf-lib";
 import { db } from "@/db";
 import { documentos, expedientes } from "@/db/schema";
@@ -19,7 +19,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     await db
       .select({ id: expedientes.id, consecutivo: expedientes.consecutivo })
       .from(expedientes)
-      .where(and(eq(expedientes.id, id), eq(expedientes.empresaId, empresaId)))
+      .where(
+        and(eq(expedientes.id, id), eq(expedientes.empresaId, empresaId), isNull(expedientes.eliminadoEn)),
+      )
       .limit(1)
   )[0];
   if (!exp) return new Response("Expediente no encontrado.", { status: 404 });
@@ -27,7 +29,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const docs = await db
     .select()
     .from(documentos)
-    .where(and(eq(documentos.expedienteId, id), eq(documentos.empresaId, empresaId)))
+    .where(
+      and(
+        eq(documentos.expedienteId, id),
+        eq(documentos.empresaId, empresaId),
+        isNull(documentos.eliminadoEn),
+      ),
+    )
     .orderBy(asc(documentos.subidoEn));
 
   if (docs.length === 0) {

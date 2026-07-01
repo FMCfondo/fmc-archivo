@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { expedientes, tiposDocumento } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
@@ -17,15 +17,17 @@ function Tarjeta({ titulo, valor, acento }: { titulo: string; valor: number; ace
 export default async function InicioPage() {
   const { empresaId } = await requireEmpresaId();
 
+  const noEliminado = isNull(expedientes.eliminadoEn);
+
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)::int` })
     .from(expedientes)
-    .where(eq(expedientes.empresaId, empresaId));
+    .where(and(eq(expedientes.empresaId, empresaId), noEliminado));
 
   const porEstado = await db
     .select({ estado: expedientes.estado, n: sql<number>`count(*)::int` })
     .from(expedientes)
-    .where(eq(expedientes.empresaId, empresaId))
+    .where(and(eq(expedientes.empresaId, empresaId), noEliminado))
     .groupBy(expedientes.estado);
   const estado = (e: string) => porEstado.find((x) => x.estado === e)?.n ?? 0;
 
@@ -37,7 +39,7 @@ export default async function InicioPage() {
     })
     .from(expedientes)
     .innerJoin(tiposDocumento, eq(expedientes.tipoId, tiposDocumento.id))
-    .where(eq(expedientes.empresaId, empresaId))
+    .where(and(eq(expedientes.empresaId, empresaId), noEliminado))
     .groupBy(tiposDocumento.id, tiposDocumento.nombre, tiposDocumento.codigo)
     .orderBy(sql`count(*) desc`)
     .limit(8);
@@ -52,7 +54,7 @@ export default async function InicioPage() {
     })
     .from(expedientes)
     .innerJoin(tiposDocumento, eq(expedientes.tipoId, tiposDocumento.id))
-    .where(eq(expedientes.empresaId, empresaId))
+    .where(and(eq(expedientes.empresaId, empresaId), noEliminado))
     .orderBy(desc(expedientes.creadoEn))
     .limit(5);
 

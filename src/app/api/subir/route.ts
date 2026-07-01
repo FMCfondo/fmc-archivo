@@ -1,21 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { db } from "@/db";
 import { consecutivos, documentos, expedientes } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
 import { cargarTipos, resolverSerie } from "@/lib/tipos";
 import { r2, R2_BUCKET } from "@/lib/r2";
+import { registrarBitacora } from "@/lib/bitacora";
+import { detectarTipoReal } from "@/lib/validar-archivo";
+import { subirArchivoSchema } from "@/lib/validacion";
 
 export const runtime = "nodejs";
-
-type TipoSoporte =
-  | "principal"
-  | "factura"
-  | "soporte_pago"
-  | "registro_contable"
-  | "comprobante_bancario"
-  | "otro";
 
 async function crearExpedienteEnCarpeta(
   empresaId: string,
@@ -42,6 +37,14 @@ async function crearExpedienteEnCarpeta(
     .insert(expedientes)
     .values({ empresaId, tipoId, consecutivo, numero, concepto: nombre, creadoPor: userId })
     .returning({ id: expedientes.id });
+
+  await registrarBitacora({
+    empresaId,
+    usuarioId: userId,
+    accion: "crear",
+    entidad: "expediente",
+    entidadId: exp.id,
+  });
   return exp.id;
 }
 
@@ -54,20 +57,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No se recibió el archivo." }, { status: 400 });
   }
 
-  const tipoId = form.get("tipoId");
-  const expedienteIdForm = form.get("expedienteId");
-  const tipoSoporte = ((form.get("tipoSoporte") as string) || "otro") as TipoSoporte;
+  const entrada = subirArchivoSchema.safeParse({
+    tipoId: form.get("tipoId") || undefined,
+    expedienteId: form.get("expedienteId") || undefined,
+    tipoSoporte: form.get("tipoSoporte") || undefined,
+  });
+  if (!entrada.success) {
+    return NextResponse.json({ error: "Datos de la solicitud inválidos." }, { status: 400 });
+  }
+  const { tipoId, expedienteId: expedienteIdForm, tipoSoporte } = entrada.data;
+
+  // Valida el contenido REAL del archivo (magic bytes), no lo que diga el navegador.
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const mimeReal = detectarTipoReal(bytes);
+  if (!mimeReal) {
+    return NextResponse.json(
+      { error: "Solo se permiten archivos PDF, JPG o PNG (el contenido no coincide)." },
+      { status: 400 },
+    );
+  }
 
   let expedienteId: string;
-  if (typeof tipoId === "string" && tipoId) {
+  if (tipoId) {
     const nombre = file.name.replace(/\.[^.]+$/, "");
     expedienteId = await crearExpedienteEnCarpeta(empresaId, session.user.id, tipoId, nombre);
-  } else if (typeof expedienteIdForm === "string" && expedienteIdForm) {
+  } else if (expedienteIdForm) {
     const exp = (
       await db
         .select({ id: expedientes.id })
         .from(expedientes)
-        .where(and(eq(expedientes.id, expedienteIdForm), eq(expedientes.empresaId, empresaId)))
+        .where(
+          and(
+            eq(expedientes.id, expedienteIdForm),
+            eq(expedientes.empresaId, empresaId),
+            isNull(expedientes.eliminadoEn),
+          ),
+        )
         .limit(1)
     )[0];
     if (!exp) return NextResponse.json({ error: "Expediente no encontrado." }, { status: 404 });
@@ -78,22 +103,32 @@ export async function POST(req: NextRequest) {
 
   const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
   const key = `${empresaId}/${crypto.randomUUID()}.${ext}`;
-  const contentType = file.type || "application/octet-stream";
-  const bytes = new Uint8Array(await file.arrayBuffer());
 
   await r2.send(
-    new PutObjectCommand({ Bucket: R2_BUCKET, Key: key, Body: bytes, ContentType: contentType }),
+    new PutObjectCommand({ Bucket: R2_BUCKET, Key: key, Body: bytes, ContentType: mimeReal }),
   );
 
-  await db.insert(documentos).values({
-    expedienteId,
+  const [doc] = await db
+    .insert(documentos)
+    .values({
+      expedienteId,
+      empresaId,
+      tipoSoporte: tipoId ? "principal" : (tipoSoporte ?? "otro"),
+      nombreArchivo: file.name,
+      r2Key: key,
+      mime: mimeReal,
+      tamano: file.size,
+      subidoPor: session.user.id,
+    })
+    .returning({ id: documentos.id });
+
+  await registrarBitacora({
     empresaId,
-    tipoSoporte: typeof tipoId === "string" && tipoId ? "principal" : tipoSoporte,
-    nombreArchivo: file.name,
-    r2Key: key,
-    mime: contentType,
-    tamano: file.size,
-    subidoPor: session.user.id,
+    usuarioId: session.user.id,
+    accion: "subir_documento",
+    entidad: "documento",
+    entidadId: doc.id,
+    detalle: file.name,
   });
 
   return NextResponse.json({ ok: true, expedienteId });

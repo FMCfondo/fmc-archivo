@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { tiposDocumento, expedientes, documentos } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
@@ -28,7 +28,9 @@ export default async function CarpetaPage({ params }: { params: Promise<{ id: st
   const exps = await db
     .select()
     .from(expedientes)
-    .where(and(eq(expedientes.tipoId, id), eq(expedientes.empresaId, empresaId)))
+    .where(
+      and(eq(expedientes.tipoId, id), eq(expedientes.empresaId, empresaId), isNull(expedientes.eliminadoEn)),
+    )
     .orderBy(asc(expedientes.creadoEn));
 
   const ids = exps.map((e) => e.id);
@@ -36,7 +38,13 @@ export default async function CarpetaPage({ params }: { params: Promise<{ id: st
     ? await db
         .select()
         .from(documentos)
-        .where(and(eq(documentos.empresaId, empresaId), inArray(documentos.expedienteId, ids)))
+        .where(
+          and(
+            eq(documentos.empresaId, empresaId),
+            inArray(documentos.expedienteId, ids),
+            isNull(documentos.eliminadoEn),
+          ),
+        )
     : [];
   const soportesDe = (eid: string) =>
     docs

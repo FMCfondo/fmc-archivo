@@ -137,19 +137,24 @@ async function main() {
 
   // 2) Usuario administrador
   const email = (process.env.SEED_ADMIN_EMAIL ?? "admin@fmc.local").toLowerCase();
-  const password = process.env.SEED_ADMIN_PASSWORD ?? "cambiar123";
+  const password = process.env.SEED_ADMIN_PASSWORD;
   let user = (
     await db.select().from(usuarios).where(eq(usuarios.email, email)).limit(1)
   )[0];
   if (!user) {
+    if (!password || password.length < 8) {
+      throw new Error(
+        "Define SEED_ADMIN_PASSWORD en .env.local con al menos 8 caracteres antes de correr el seed (no hay clave por defecto).",
+      );
+    }
     const passwordHash = await bcrypt.hash(password, 10);
     user = (
       await db
         .insert(usuarios)
-        .values({ email, nombre: "Administrador", passwordHash })
+        .values({ email, nombre: "Administrador", passwordHash, debeCambiarPassword: true })
         .returning()
     )[0];
-    console.log(`✔ Usuario admin creado -> ${email} / ${password}  (cámbialo luego)`);
+    console.log(`✔ Usuario admin creado -> ${email} (se pedirá cambiar la clave al ingresar)`);
   } else {
     console.log(`· Usuario ${email} ya existía`);
   }
