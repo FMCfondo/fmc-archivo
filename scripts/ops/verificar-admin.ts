@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import { db } from "../src/db";
-import { usuarios } from "../src/db/schema";
+import { db } from "../../src/db";
+import { usuarios } from "../../src/db/schema";
 
 async function main() {
   const rows = await db

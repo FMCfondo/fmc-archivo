@@ -1,6 +1,6 @@
 import { desc, sql } from "drizzle-orm";
-import { db } from "../src/db";
-import { intentosLogin, bitacora } from "../src/db/schema";
+import { db } from "../../src/db";
+import { intentosLogin, bitacora } from "../../src/db/schema";
 
 async function main() {
   console.log("=== intentos_login (últimos 5) ===");

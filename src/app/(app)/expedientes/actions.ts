@@ -7,17 +7,10 @@ import { db } from "@/db";
 import { consecutivos, documentos, expedientes } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
 import { cargarTipos, resolverSerie } from "@/lib/tipos";
-import { urlSubida, urlDescarga } from "@/lib/r2";
+import { urlDescarga } from "@/lib/r2";
 import { registrarBitacora } from "@/lib/bitacora";
 import { camposExpedienteSchema } from "@/lib/validacion";
 
-type TipoSoporte =
-  | "principal"
-  | "factura"
-  | "soporte_pago"
-  | "registro_contable"
-  | "comprobante_bancario"
-  | "otro";
 type EstadoExpediente = "pendiente" | "completo" | "fusionado";
 
 function str(v: FormDataEntryValue | null): string | null {
@@ -179,67 +172,6 @@ export async function eliminarExpediente(formData: FormData) {
 
   revalidatePath("/expedientes");
   redirect("/expedientes");
-}
-
-/** URL prefirmada para subir un archivo directo a R2. */
-export async function generarUrlSubida(nombreArchivo: string, contentType: string) {
-  const { empresaId } = await requireEmpresaId();
-  const partes = nombreArchivo.split(".");
-  const ext = partes.length > 1 ? partes.pop() : "bin";
-  const key = `${empresaId}/${crypto.randomUUID()}.${ext}`;
-  const url = await urlSubida(key, contentType);
-  return { url, key };
-}
-
-/** Registra en la BD un documento ya subido a R2. */
-export async function registrarDocumento(input: {
-  expedienteId: string;
-  r2Key: string;
-  nombreArchivo: string;
-  mime: string;
-  tamano: number;
-  tipoSoporte: TipoSoporte;
-}) {
-  const { session, empresaId } = await requireEmpresaId();
-  const exp = (
-    await db
-      .select({ id: expedientes.id })
-      .from(expedientes)
-      .where(
-        and(
-          eq(expedientes.id, input.expedienteId),
-          eq(expedientes.empresaId, empresaId),
-          isNull(expedientes.eliminadoEn),
-        ),
-      )
-      .limit(1)
-  )[0];
-  if (!exp) throw new Error("Expediente no encontrado.");
-
-  const [doc] = await db
-    .insert(documentos)
-    .values({
-      expedienteId: input.expedienteId,
-      empresaId,
-      tipoSoporte: input.tipoSoporte,
-      nombreArchivo: input.nombreArchivo,
-      r2Key: input.r2Key,
-      mime: input.mime,
-      tamano: input.tamano,
-      subidoPor: session.user.id,
-    })
-    .returning({ id: documentos.id });
-
-  await registrarBitacora({
-    empresaId,
-    usuarioId: session.user.id,
-    accion: "subir_documento",
-    entidad: "documento",
-    entidadId: doc.id,
-    detalle: input.nombreArchivo,
-  });
-
-  revalidatePath(`/expedientes/${input.expedienteId}`);
 }
 
 /** URL prefirmada para abrir/descargar un documento. */

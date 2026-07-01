@@ -3,9 +3,9 @@ import { createHash } from "node:crypto";
 import { join, extname, basename } from "node:path";
 import { and, eq, like, sql } from "drizzle-orm";
 import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { db } from "../src/db";
-import { empresas, usuariosEmpresas, tiposDocumento, expedientes, documentos } from "../src/db/schema";
-import { r2, R2_BUCKET } from "../src/lib/r2";
+import { db } from "../../src/db";
+import { empresas, usuariosEmpresas, tiposDocumento, expedientes, documentos } from "../../src/db/schema";
+import { r2, R2_BUCKET } from "../../src/lib/r2";
 
 const BASE = "L:\\Mi unidad\\Fondo Mutuo De Cobertura\\FMC\\ARCHIVO";
 const REAL = process.argv.includes("--real");

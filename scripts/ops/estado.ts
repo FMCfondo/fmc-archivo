@@ -1,6 +1,6 @@
 import { and, desc, eq, like, sql } from "drizzle-orm";
-import { db } from "../src/db";
-import { empresas, documentos, expedientes, tiposDocumento } from "../src/db/schema";
+import { db } from "../../src/db";
+import { empresas, documentos, expedientes, tiposDocumento } from "../../src/db/schema";
 
 async function main() {
   const empresa = (await db.select().from(empresas).where(eq(empresas.nombre, "FMC")).limit(1))[0];

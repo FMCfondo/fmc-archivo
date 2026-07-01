@@ -1,5 +1,5 @@
 import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { r2, R2_BUCKET } from "../src/lib/r2";
+import { r2, R2_BUCKET } from "../../src/lib/r2";
 
 async function main() {
   const key = `__test__/${Date.now()}.txt`;

@@ -1,5 +1,5 @@
 import { GetBucketCorsCommand, PutBucketCorsCommand } from "@aws-sdk/client-s3";
-import { r2, R2_BUCKET } from "../src/lib/r2";
+import { r2, R2_BUCKET } from "../../src/lib/r2";
 
 async function main() {
   console.log("=== CORS ACTUAL ===");

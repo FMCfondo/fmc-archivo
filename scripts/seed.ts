@@ -3,8 +3,8 @@ config({ path: ".env.local" });
 
 import { and, eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { db } from "./index";
-import { empresas, usuarios, usuariosEmpresas, tiposDocumento } from "./schema";
+import { db } from "../src/db/index";
+import { empresas, usuarios, usuariosEmpresas, tiposDocumento } from "../src/db/schema";
 
 // Catálogo curado del archivo de FMC (revisado sobre FMC\ARCHIVO).
 // Solo entran documentos finales/soporte; los Excel de conciliación y los

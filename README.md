@@ -1,15 +1,19 @@
 # Archivo FMC
 
-Sistema de archivo documental por **expedientes**: cada expediente (factura, nómina, egreso…)
-agrupa su documento principal y todos sus soportes (pago, registro contable, comprobante
-bancario), con su consecutivo automático y los datos de la carpeta física. Multiempresa.
+Sistema de archivo documental contable **multiempresa**: documentos organizados en carpetas
+jerárquicas, cada uno con sus soportes, consecutivo por serie contable, referencia a la
+carpeta física y PDF unido imprimible.
+
+> 📐 **Antes de tocar código, lee [ARCHITECTURE.md](ARCHITECTURE.md)** — explica el glosario
+> del dominio, cuál de las dos interfaces es la principal y el flujo real de subida de archivos.
 
 ## Stack
 
 - **Next.js** (App Router) + TypeScript + Tailwind
-- **Neon** (PostgreSQL) + Drizzle ORM
-- **Auth.js** (login con correo/contraseña)
-- **Cloudflare R2** (almacenamiento de los PDF; descargas sin costo)
+- **Neon** (PostgreSQL serverless) + Drizzle ORM
+- **Auth.js v5** (login con correo/contraseña + rate limiting)
+- **Cloudflare R2** (almacenamiento de archivos; descargas sin costo de egreso)
+- Desplegado en **Vercel** (por CLI: `vercel deploy --prod`)
 
 ## Puesta en marcha
 
@@ -17,63 +21,43 @@ bancario), con su consecutivo automático y los datos de la carpeta física. Mul
    ```bash
    npm install
    ```
-2. Copiar `.env.example` a `.env.local` y rellenar los valores (Neon y R2):
-   ```bash
-   cp .env.example .env.local
-   ```
+2. Copiar `.env.example` a `.env.local` y rellenar los valores (Neon y R2).
+   `SEED_ADMIN_PASSWORD` es obligatoria (mínimo 8 caracteres, sin valor por defecto).
 3. Crear las tablas y cargar el catálogo inicial:
    ```bash
    npm run db:migrate   # aplica el esquema a la base de datos
-   npm run db:seed      # crea empresa FMC, usuario admin y el catálogo
+   npm run db:seed      # crea empresa FMC, usuario admin y el catálogo de carpetas
    ```
 4. Arrancar en desarrollo:
    ```bash
    npm run dev
    ```
-   Abrir http://localhost:3000 e iniciar sesión con el usuario admin del seed
-   (`SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`).
+   Abrir http://localhost:3000 — al primer ingreso el sistema exige cambiar la contraseña.
 
 ## Scripts
 
 | Comando | Qué hace |
 |---|---|
-| `npm run dev` | Servidor de desarrollo |
-| `npm run build` | Build de producción |
-| `npm run db:generate` | Genera migración SQL desde el esquema |
+| `npm run dev` / `build` / `start` | Ciclo estándar de Next.js |
+| `npm run db:generate` | Genera migración SQL desde `src/db/schema.ts` |
 | `npm run db:migrate` | Aplica las migraciones a Neon |
-| `npm run db:seed` | Crea empresa, admin y catálogo |
+| `npm run db:seed` | Empresa + admin + catálogo inicial (idempotente) |
+| `npm run ops:estado` | Conteo de documentos importados por carpeta |
+| `npm run ops:verificar-admin` | Usuarios y flag de cambio de contraseña |
+| `npm run ops:verificar-seguridad` | Últimos intentos de login y bitácora |
+| `npm run ops:smoke-login` | Prueba login + página protegida (`TEST_BASE_URL`) |
 
-## Cloudflare R2 — CORS
+Más detalle (incluidos los scripts one-shot peligrosos): [scripts/README.md](scripts/README.md).
 
-Para que el navegador suba archivos directo a R2, el bucket necesita una política CORS que
-permita tu origen. En el bucket → **Settings → CORS Policy**:
+## Subida de archivos
 
-```json
-[
-  {
-    "AllowedOrigins": ["http://localhost:3000", "https://TU-DOMINIO.vercel.app"],
-    "AllowedMethods": ["GET", "PUT"],
-    "AllowedHeaders": ["*"],
-    "ExposeHeaders": ["ETag"],
-    "MaxAgeSeconds": 3600
-  }
-]
-```
+Todo archivo sube por **`POST /api/subir`** (el servidor guarda en R2). **No se necesita
+configurar CORS en el bucket** — la vía de subida directa del navegador fue retirada.
+Solo se aceptan PDF/JPG/PNG (validados por contenido real, no por extensión), máx ~4.5 MB.
 
-## Notas de seguridad
+## Seguridad
 
-- `.env.local` no se versiona (está en `.gitignore`). No subir secretos al repo.
-- Cambiar la contraseña del usuario admin tras el primer ingreso.
-
-## Estructura
-
-- `src/db/` — esquema, cliente y seed
-- `src/auth.ts` — configuración de Auth.js
-- `src/lib/` — sesión, R2, formato
-- `src/app/(app)/expedientes/` — listado, creación, detalle y subida
-- `src/app/(app)/catalogo/` — gestión de categorías
-
-
-
-
-
+- `.env.local` no se versiona. No subir secretos al repo (las claves de producción viven
+  en las variables de entorno de Vercel).
+- Soft-delete + bitácora de auditoría en las mutaciones de documentos.
+- Detalle completo del modelo de seguridad en [ARCHITECTURE.md](ARCHITECTURE.md#seguridad-implementado).

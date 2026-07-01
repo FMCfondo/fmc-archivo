@@ -3,9 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { tiposDocumento, expedientes, documentos, consecutivos } from "@/db/schema";
+import { tiposDocumento, expedientes, documentos } from "@/db/schema";
 import { requireEmpresaId } from "@/lib/session";
-import { cargarTipos, resolverSerie } from "@/lib/tipos";
 import { registrarBitacora } from "@/lib/bitacora";
 import { guardarDocumentoSchema } from "@/lib/validacion";
 
@@ -50,42 +49,6 @@ export async function crearCarpeta(formData: FormData) {
   });
 
   revalidatePath(parentId ? `/carpetas/${parentId}` : "/carpetas");
-}
-
-/** Crea un documento (fila) en una carpeta y devuelve su id para subir el archivo. */
-export async function crearDocumentoRapido(tipoId: string, nombre: string) {
-  const { session, empresaId } = await requireEmpresaId();
-  const tipos = await cargarTipos(empresaId);
-  const serie = resolverSerie(tipos, tipoId);
-
-  const [c] = await db
-    .insert(consecutivos)
-    .values({ empresaId, tipoId: serie.ownerId, ultimo: 1 })
-    .onConflictDoUpdate({
-      target: [consecutivos.empresaId, consecutivos.tipoId],
-      set: { ultimo: sql`${consecutivos.ultimo} + 1` },
-    })
-    .returning({ ultimo: consecutivos.ultimo });
-  const numero = c.ultimo;
-  const consecutivo =
-    serie.prefijo && serie.libro
-      ? `${serie.prefijo}-${serie.libro}-${numero}`
-      : `${serie.codigo}-${numero}`;
-
-  const [exp] = await db
-    .insert(expedientes)
-    .values({ empresaId, tipoId, consecutivo, numero, concepto: nombre, creadoPor: session.user.id })
-    .returning({ id: expedientes.id });
-
-  await registrarBitacora({
-    empresaId,
-    usuarioId: session.user.id,
-    accion: "crear",
-    entidad: "expediente",
-    entidadId: exp.id,
-  });
-
-  return { id: exp.id };
 }
 
 /** Guarda nombre, tipo (mueve de carpeta) y carpeta física de un documento. */
